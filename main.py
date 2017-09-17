@@ -1,9 +1,12 @@
-import uasyncio.core as asyncio
+import uasyncio as asyncio
 import asyn
 import aswitch
 import machine
 import neopixel
 import arequests
+
+from mqtt_as import MQTTClient
+from config import config
 
 
 class Button:
@@ -197,4 +200,37 @@ async def do_http():
         print(await response.json())
 
 
-main()
+SERVER = '192.168.3.6'  # Change to suit e.g. 'iot.eclipse.org'
+
+
+def callback(topic, msg):
+    print((topic, msg))
+
+
+async def conn_han(client):
+    await client.subscribe('/action/Brian/', 0)
+
+
+async def main2(client):
+    await client.connect()
+    n = 0
+    while True:
+        await asyncio.sleep(5)
+        print('publish', n)
+        # If WiFi is down the following will pause for the duration.
+        await client.publish('test', '{}'.format(n), qos=0)
+        n += 1
+
+
+def main3():
+    config['subs_cb'] = callback
+    config['connect_coro'] = conn_han
+    config['server'] = SERVER
+
+    MQTTClient.DEBUG = True  # Optional: print diagnostic messages
+    client = MQTTClient(config)
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main2(client))
+    finally:
+        client.close()  # Prevent LmacRxBlk:1 errors
