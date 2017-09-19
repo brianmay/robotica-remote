@@ -130,20 +130,20 @@ class Lights:
         self._taskid = 0
 
     def clear(self) -> None:
-        self._np.fill([0] * 12)
+        self._np.fill( (0,0,0) )
         self._np.write()
 
     def set_ok(self) -> None:
         loop = asyncio.get_event_loop()
         color = (0, 63, 0)
         self._taskid = self._taskid + 1
-        loop.create_task(self.rotate(self._taskid, color, 0.1))
+        loop.create_task(self.flash(self._taskid, color, 0.1))
 
     def set_danger(self) -> None:
         loop = asyncio.get_event_loop()
         color = (63, 0, 0)
         self._taskid = self._taskid + 1
-        loop.create_task(self.rotate(self._taskid, color, 0.1))
+        loop.create_task(self.flash(self._taskid, color, 1))
 
     async def rotate(self, taskid: int, color: Color, delay: float) -> None:
         i = 0
@@ -151,7 +151,7 @@ class Lights:
         for repeat in range(int(10 / delay)):
             np = self._np
 
-            np.fill([0] * 12)
+            np.fill( (0,0,0) )
             np[(i + 0) % 12] = color
             np[(i + 1) % 12] = color
             np[(i + 2) % 12] = color
@@ -168,6 +168,26 @@ class Lights:
 
         self.clear()
 
+    async def flash(self, taskid: int, color: Color, delay: float) -> None:
+        for repeat in range(2):
+            np = self._np
+
+            np.fill(color)
+            np.write()
+
+            await asyncio.sleep(delay)
+            if self._taskid != taskid:
+                # another task running, just exit
+                return
+
+            self.clear()
+
+            await asyncio.sleep(delay)
+            if self._taskid != taskid:
+                # another task running, just exit
+                return
+
+        self.clear()
 
 async def do_http() -> None:
     url = "http://dining.pri:8080/execute/"
