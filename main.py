@@ -165,8 +165,6 @@ class Lights:
                 return
 
             i = (i + 1*n) % 12
-            if i == 0:
-                n = n * -1
 
         self.clear()
 
