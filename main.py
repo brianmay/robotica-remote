@@ -11,13 +11,38 @@ from mqtt_as import MQTTClient
 from config import config
 
 try:
-    from typing import Any, List, Callable, Optional, Tuple
+    from typing import Any, Dict, List, Callable, Optional, Tuple
     Color = Tuple[int, int, int]
     Callback = Callable[[], Any]
 except ImportError:
     pass
 
 MQTT_SERVER = '192.168.3.6'  # Change to suit e.g. 'iot.eclipse.org'
+
+WHITE = {
+    'hue': 0,
+    'saturation': 0,
+    'brightness': 100,
+    'kelvin': 5500,
+}
+RED = {
+    'hue': 0,
+    'saturation': 100,
+    'brightness': 100,
+    'kelvin': 5500,
+}
+GREEN = {
+    'hue': 120,
+    'saturation': 100,
+    'brightness': 100,
+    'kelvin': 5500,
+}
+BLUE = {
+    'hue': 240,
+    'saturation': 100,
+    'brightness': 100,
+    'kelvin': 5500,
+}
 
 
 # If a callback is passed, run it and return.
@@ -79,7 +104,6 @@ class Button:
         self._event.set()
         # print("got irq", self._event.is_set())
 
-
     async def _buttoncheck(self) -> None:
         num_downs = 0
         num_ups = 0
@@ -130,7 +154,7 @@ class Lights:
         self._taskid = 0
 
     def clear(self) -> None:
-        self._np.fill( (0,0,0) )
+        self._np.fill((0, 0, 0))
         self._np.write()
 
     def set_ok(self) -> None:
@@ -151,7 +175,7 @@ class Lights:
         for repeat in range(int(10 / delay)):
             np = self._np
 
-            np.fill( (0,0,0) )
+            np.fill((0, 0, 0))
             np[(i + 0) % 12] = color
             np[(i + 1) % 12] = color
             np[(i + 2) % 12] = color
@@ -188,6 +212,7 @@ class Lights:
                 return
 
         self.clear()
+
 
 async def do_http() -> None:
     url = "http://dining.pri:8080/execute/"
@@ -270,6 +295,30 @@ class MQTT:
         }
         await self._publish("/execute/", data)
 
+    async def lights(
+            self, locations: List[str], action: str,
+            color: Optional[Dict[str, int]]=None):
+        action = {
+            "lights": {"action": action},
+        }
+        if color is not None:
+            action["lights"]["color"] = color
+        data = {
+            "locations": locations,
+            "actions": [action],
+        }
+        await self._publish("/execute/", data)
+
+    async def music(self, locations: List[str], play_list: str):
+        action = {
+            "music": {"play_list": play_list},
+        }
+        data = {
+            "locations": locations,
+            "actions": [action],
+        }
+        await self._publish("/execute/", data)
+
 
 def main() -> None:
     lights = Lights(machine.Pin(13))
@@ -285,14 +334,15 @@ def main() -> None:
     button_UR = Button(pin_UR)
     button_LR = Button(pin_LR)
 
-    button_UL.press_func(lambda: lights.set_ok())
-    button_LL.press_func(lambda: lights.set_danger())
+    button_UL.press_func(lambda: mqtt.music(['Brian'], 'wake_up'))
+    button_LL.press_func(lambda: mqtt.music(['Brian'], 'wake_up'))
+    button_UR.press_func(lambda: mqtt.music(['Brian'], 'wake_up'))
+    button_LR.press_func(lambda: mqtt.music(['Brian'], 'wake_up'))
 
-    button_UR.press_func(
-        lambda: mqtt.say(['Brian'], "You pushed the wrong button."))
-    button_LR.press_func(
-        lambda: mqtt.say(['Brian'], "You pushed the dangerous button.",
-        flash=True))
+    button_UL.long_func(lambda: mqtt.lights(['Brian'], 'turn_off'))
+    button_LL.long_func(lambda: mqtt.lights(['Brian'], 'turn_on', WHITE))
+    button_UR.long_func(lambda: mqtt.lights(['Brian'], 'turn_on', GREEN))
+    button_LR.long_func(lambda: mqtt.lights(['Brian'], 'turn_on', RED))
 
     loop = asyncio.get_event_loop()
     loop.create_task(mqtt.connect())
