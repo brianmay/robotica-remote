@@ -23,16 +23,16 @@ MQTT_SERVER = '192.168.3.6'  # Change to suit e.g. 'iot.eclipse.org'
 # If a callback is passed, run it and return.
 # If a coro is passed initiate it and return.
 # coros are passed by name i.e. not using function call syntax.
-def launch(func: Callback) -> None:
-    res = func()
-    if isinstance(res, asyn.type_coro):
-        loop = asyncio.get_event_loop()
-        loop.create_task(res)
+def launch(func: Optional[Callback]) -> None:
+    if func is not None:
+        res = func()
+        if isinstance(res, asyn.type_coro):
+            loop = asyncio.get_event_loop()
+            loop.create_task(res)
 
 
 class Button:
     debounce_ms = 50
-    long_press_ms = 1000
     double_click_ms = 400
 
     def __init__(self, pin: machine.Pin) -> None:
@@ -79,11 +79,23 @@ class Button:
         self._event.set()
         # print("got irq", self._event.is_set())
 
+
     async def _buttoncheck(self) -> None:
-        if self._long_func:
-            longdelay = aswitch.Delay_ms(self._long_func)
-        if self._double_func:
-            doubledelay = aswitch.Delay_ms()
+        num_downs = 0
+        num_ups = 0
+
+        def _timer() -> None:
+            if num_ups == 1 and num_downs == 1:
+                print("got short click")
+                launch(self._press_func)
+            elif num_ups == 1 and num_downs == 0:
+                print("got long press")
+                launch(self._long_func)
+            elif num_ups == 2:
+                print("got double click")
+                launch(self._double_func)
+
+        doubledelay = aswitch.Delay_ms(_timer)
 
         while True:
             # print("waiting", self._event.is_set())
@@ -100,25 +112,13 @@ class Button:
             if state != self.buttonstate:
                 self.buttonstate = state
                 if state:
-                    # Button is pressed
-                    if self._long_func and not longdelay.running():
-                        # Start long press delay
-                        longdelay.trigger(self.long_press_ms)
-                    if self._double_func:
-                        if doubledelay.running():
-                            launch(self._double_func)
-                        else:
-                            # First click: start doubleclick timer
-                            doubledelay.trigger(self.double_click_ms)
-                    if self._press_func:
-                        launch(self._press_func)
+                    if not doubledelay.running():
+                        doubledelay.trigger(self.double_click_ms)
+                        num_ups = 0
+                        num_downs = 0
+                    num_ups += 1
                 else:
-                    # Button release
-                    if self._long_func and longdelay.running():
-                        # Avoid interpreting a second click as a long push
-                        longdelay.stop()
-                    if self._release_func:
-                        launch(self._release_func)
+                    num_downs += 1
 
             self._event.clear()
 
