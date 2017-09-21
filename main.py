@@ -217,6 +217,7 @@ class Lights:
         finally:
             if self._taskid == taskid:
                 self.set_state(self._task_initial)
+                self._task_initial = None
 
     async def flash(self, taskid: int, color: Color, delay: float) -> None:
         if self._task_initial is None:
@@ -242,6 +243,7 @@ class Lights:
         finally:
             if self._taskid == taskid:
                 self.set_state(self._task_initial)
+                self._task_initial = None
 
 
 async def do_http() -> None:
