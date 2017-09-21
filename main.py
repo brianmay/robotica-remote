@@ -150,6 +150,7 @@ class Lights:
         self._pin = pin  # Initialise for input
         self._np = neopixel.NeoPixel(pin, NUM_LIGHTS, timing=True)
         self._taskid = 0
+        self._task_initial = None  # type: Optional[List[Color]]
 
     def get_state(self) -> List[Color]:
         return [
@@ -168,19 +169,19 @@ class Lights:
 
     def set_ok(self) -> None:
         loop = asyncio.get_event_loop()
-        color = (0, 63, 0)
+        color = (0, 31, 0)
         self._taskid = self._taskid + 1
         loop.create_task(self.flash(self._taskid, color, 0.2))
 
     def set_danger(self) -> None:
         loop = asyncio.get_event_loop()
-        color = (63, 0, 0)
+        color = (31, 0, 0)
         self._taskid = self._taskid + 1
         loop.create_task(self.flash(self._taskid, color, 0.2))
 
     def set_timer(self, minutes: int) -> None:
         self._np.fill((0, 0, 0))
-        colors = [ (31,0,0), (0,31,0), (0,0,31) ]  # type: List[Color]
+        colors = [ (7,0,0), (0,7,0), (0,0,7) ]  # type: List[Color]
         num_lights = ((minutes - 1) % self._np.n) + 1
         num_cycles = ((minutes - 1) // self._np.n)
         if num_cycles > len(colors)-1:
@@ -192,49 +193,55 @@ class Lights:
     async def rotate(self, taskid: int, color: Color, delay: float) -> None:
         i = 0
         n = 1
-        initial = self.get_state()
+        if self._task_initial is None:
+            self._task_initial = self.get_state()
 
-        for repeat in range(int(10 / delay)):
-            np = self._np
+        try:
+            for repeat in range(int(10 / delay)):
+                np = self._np
 
-            np.fill((0, 0, 0))
-            np[(i + 0) % np.n] = color
-            np[(i + 1) % np.n] = color
-            np[(i + 2) % np.n] = color
-            np[(i + 3) % np.n] = color
+                np.fill((0, 0, 0))
+                np[(i + 0) % np.n] = color
+                np[(i + 1) % np.n] = color
+                np[(i + 2) % np.n] = color
+                np[(i + 3) % np.n] = color
 
-            np.write()
+                np.write()
 
-            await asyncio.sleep(delay)
-            if self._taskid != taskid:
-                # another task running, just exit
-                return
+                await asyncio.sleep(delay)
+                if self._taskid != taskid:
+                    # another task running, just exit
+                    return
 
-            i = (i + 1*n) % np.n
-
-        self.set_state(initial)
+                i = (i + 1*n) % np.n
+        finally:
+            if self._taskid == taskid:
+                self.set_state(self._task_initial)
 
     async def flash(self, taskid: int, color: Color, delay: float) -> None:
-        initial = self.get_state()
-        for repeat in range(4):
-            np = self._np
+        if self._task_initial is None:
+            self._task_initial = self.get_state()
+        try:
+            for repeat in range(4):
+                np = self._np
 
-            np.fill(color)
-            np.write()
+                np.fill(color)
+                np.write()
 
-            await asyncio.sleep(delay)
-            if self._taskid != taskid:
-                # another task running, just exit
-                return
+                await asyncio.sleep(delay)
+                if self._taskid != taskid:
+                    # another task running, just exit
+                    return
 
-            self.set_state(initial)
+                self.clear()
 
-            await asyncio.sleep(delay)
-            if self._taskid != taskid:
-                # another task running, just exit
-                return
-
-        self.set_state(initial)
+                await asyncio.sleep(delay)
+                if self._taskid != taskid:
+                    # another task running, just exit
+                    return
+        finally:
+            if self._taskid == taskid:
+                self.set_state(self._task_initial)
 
 
 async def do_http() -> None:
@@ -277,9 +284,7 @@ class MQTT:
     def _process(self, topic: str, data: Any) -> None:
         if topic.startswith('/action/Brian/'):
             print((topic, data))
-            if 'lights' in data:
-                self._lights.set_danger()
-            else:
+            if 'message' in data:
                 self._lights.set_ok()
 
     def _callback(self, topic: bytes, msg: bytes) -> None:
