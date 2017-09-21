@@ -1,6 +1,7 @@
 import json
 
 import uasyncio as asyncio
+import utime as time
 import asyn
 import aswitch
 import machine
@@ -179,7 +180,7 @@ class Lights:
         self._taskid = self._taskid + 1
         loop.create_task(self.flash(self._taskid, color, 0.2))
 
-    def set_timer(self, minutes: int) -> None:
+    def _set_timer(self, minutes: int) -> None:
         colors = [ (7,0,0), (0,7,0), (0,0,7) ]  # type: List[Color]
         num_lights = (minutes % self._np.n)
         num_cycles = (minutes // self._np.n)
@@ -198,6 +199,17 @@ class Lights:
         for i in range(num_lights):
             self._np[i] = fg
         self._np.write()
+
+    async def set_timer(self, minutes: int) -> None:
+        self._set_timer(minutes)
+        await asyncio.sleep(0.5)
+        self._set_timer(minutes + 1)
+        await asyncio.sleep(0.5)
+        self._set_timer(minutes)
+        await asyncio.sleep(0.5)
+        self._set_timer(minutes + 1)
+        await asyncio.sleep(0.5)
+        self._set_timer(minutes)
 
     async def rotate(self, taskid: int, color: Color, delay: float) -> None:
         i = 0
@@ -380,20 +392,32 @@ class Timer:
         self._timer_running = False
 
     async def execute(self, locations: List[str], minutes: int):
+        loop = asyncio.get_event_loop()
+
         if self._timer_running:
             await self._mqtt.say(locations, "Timer is already set.")
             print("Timer is already set.")
             return
 
         self._timer_running = True
+        timer_stop = time.ticks_add(loop.time(), minutes*60000 - 2000)
         try:
             print("Timer started at %d minutes." % minutes)
             await self._mqtt.say(locations, "Timer started at %d minutes." % minutes)
-            for minute in range(minutes):
-                print("Timer elapsed %d minutes of %d." % (minute, minutes))
-                self._lights.set_timer(minutes - minute)
-                await asyncio.sleep(60)
+
+            twait = time.ticks_diff(timer_stop, loop.time())
+            while twait > 0:
+                minute = twait // 60000 + 1
+                print("Timer left %d minutes of %d." % (minute, minutes))
+                await self._lights.set_timer(minute)
+
+                twait = time.ticks_diff(timer_stop, loop.time())
+                sleep = (twait % 60000)/1000 + 1
+                await asyncio.sleep(sleep)
+                twait = time.ticks_diff(timer_stop, loop.time())
+
             print("Timer stopped %d minutes." % minutes)
+            await self._lights.set_timer(0)
             self._lights.clear()
             await self._mqtt.say(locations, "The time is up!")
         except Exception as e:
