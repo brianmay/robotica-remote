@@ -18,6 +18,7 @@ except ImportError:
     pass
 
 MQTT_SERVER = '192.168.3.6'  # Change to suit e.g. 'iot.eclipse.org'
+NUM_LIGHTS = 12
 
 WHITE = {
     'hue': 0,
@@ -70,9 +71,6 @@ class Button:
         self.sense = pin.value()  # Convert from electrical to logical value
         self.buttonstate = self.rawstate()  # Initial state
 
-        # pin.irq(
-        #    trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING,
-        #    handler=lambda param: print("IRQ", param))
         pin.irq(
            trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING,
            handler=self._irq)
@@ -150,8 +148,19 @@ class Button:
 class Lights:
     def __init__(self, pin: machine.Pin) -> None:
         self._pin = pin  # Initialise for input
-        self._np = neopixel.NeoPixel(pin, 12, timing=True)
+        self._np = neopixel.NeoPixel(pin, NUM_LIGHTS, timing=True)
         self._taskid = 0
+
+    def get_state(self) -> List[Color]:
+        return [
+            self._np[i]
+            for i in range(self._np.n)
+            ]
+
+    def set_state(self, colors: List[Color]) -> None:
+        for i, color in enumerate(colors):
+            self._np[i] = color
+        self._np.write()
 
     def clear(self) -> None:
         self._np.fill((0, 0, 0))
@@ -161,25 +170,38 @@ class Lights:
         loop = asyncio.get_event_loop()
         color = (0, 63, 0)
         self._taskid = self._taskid + 1
-        loop.create_task(self.flash(self._taskid, color, 0.1))
+        loop.create_task(self.flash(self._taskid, color, 0.2))
 
     def set_danger(self) -> None:
         loop = asyncio.get_event_loop()
         color = (63, 0, 0)
         self._taskid = self._taskid + 1
-        loop.create_task(self.flash(self._taskid, color, 1))
+        loop.create_task(self.flash(self._taskid, color, 0.2))
+
+    def set_timer(self, minutes: int) -> None:
+        self._np.fill((0, 0, 0))
+        colors = [ (31,0,0), (0,31,0), (0,0,31) ]  # type: List[Color]
+        num_lights = ((minutes - 1) % self._np.n) + 1
+        num_cycles = ((minutes - 1) // self._np.n)
+        if num_cycles > len(colors)-1:
+            num_cycles = len(colors)-1
+        for i in range(num_lights):
+            self._np[i] = colors[num_cycles]
+        self._np.write()
 
     async def rotate(self, taskid: int, color: Color, delay: float) -> None:
         i = 0
         n = 1
+        initial = self.get_state()
+
         for repeat in range(int(10 / delay)):
             np = self._np
 
             np.fill((0, 0, 0))
-            np[(i + 0) % 12] = color
-            np[(i + 1) % 12] = color
-            np[(i + 2) % 12] = color
-            np[(i + 3) % 12] = color
+            np[(i + 0) % np.n] = color
+            np[(i + 1) % np.n] = color
+            np[(i + 2) % np.n] = color
+            np[(i + 3) % np.n] = color
 
             np.write()
 
@@ -188,12 +210,13 @@ class Lights:
                 # another task running, just exit
                 return
 
-            i = (i + 1*n) % 12
+            i = (i + 1*n) % np.n
 
-        self.clear()
+        self.set_state(initial)
 
     async def flash(self, taskid: int, color: Color, delay: float) -> None:
-        for repeat in range(2):
+        initial = self.get_state()
+        for repeat in range(4):
             np = self._np
 
             np.fill(color)
@@ -204,14 +227,14 @@ class Lights:
                 # another task running, just exit
                 return
 
-            self.clear()
+            self.set_state(initial)
 
             await asyncio.sleep(delay)
             if self._taskid != taskid:
                 # another task running, just exit
                 return
 
-        self.clear()
+        self.set_state(initial)
 
 
 async def do_http() -> None:
@@ -296,11 +319,11 @@ class MQTT:
         await self._publish("/execute/", data)
 
     async def lights(
-            self, locations: List[str], action: str,
+            self, locations: List[str], light_action: str,
             color: Optional[Dict[str, int]]=None):
         action = {
-            "lights": {"action": action},
-        }
+            "lights": {"action": light_action},
+        }  # type: Dict[str, Any]
         if color is not None:
             action["lights"]["color"] = color
         data = {
@@ -319,10 +342,56 @@ class MQTT:
         }
         await self._publish("/execute/", data)
 
+    async def music_lights(
+            self, locations: List[str], play_list: str,
+            color: Dict[str, int]):
+        action = {
+            "music": {"play_list": play_list},
+            "lights": {"action": "turn_on", "color": color},
+        }
+        data = {
+            "locations": locations,
+            "actions": [action],
+        }
+        await self._publish("/execute/", data)
+
+
+class Timer:
+
+    def __init__(self, lights: Lights, mqtt: MQTT) -> None:
+        self._lights = lights
+        self._mqtt = mqtt
+        self._timer_running = False
+
+    async def execute(self, locations: List[str], minutes: int):
+        if self._timer_running:
+            await self._mqtt.say(locations, "Timer is already set.")
+            print("Timer is already set.")
+            return
+
+        self._timer_running = True
+        try:
+            print("Timer started at %d minutes." % minutes)
+            await self._mqtt.say(locations, "Timer started at %d minutes." % minutes)
+            for minute in range(minutes):
+                print("Timer elapsed %d minutes of %d." % (minute, minutes))
+                self._lights.set_timer(minutes - minute)
+                await asyncio.sleep(60)
+            print("Timer stopped %d minutes." % minutes)
+            self._lights.clear()
+            await self._mqtt.say(locations, "The time is up!")
+        except Exception as e:
+            print("Timer encountered as error: %s" % e)
+            self._lights.clear()
+            await self._mqtt.say(locations, "The timer crashed!")
+        finally:
+            self._timer_running = False
+
 
 def main() -> None:
     lights = Lights(machine.Pin(13))
     mqtt = MQTT(MQTT_SERVER, lights)
+    timer = Timer(lights, mqtt)
 
     pin_UL = machine.Pin(25, machine.Pin.IN, machine.Pin.PULL_UP)
     pin_LL = machine.Pin(26, machine.Pin.IN, machine.Pin.PULL_UP)
@@ -334,16 +403,18 @@ def main() -> None:
     button_UR = Button(pin_UR)
     button_LR = Button(pin_LR)
 
-    button_UL.press_func(lambda: mqtt.music(['Brian'], 'wake_up'))
-    button_LL.press_func(lambda: mqtt.music(['Brian'], 'wake_up'))
-    button_UR.press_func(lambda: mqtt.music(['Brian'], 'wake_up'))
-    button_LR.press_func(lambda: mqtt.music(['Brian'], 'wake_up'))
+    loc = ['Brian']
+    button_UL.press_func(lambda: mqtt.music_lights(loc, 'red', RED))
+    button_LL.press_func(lambda: mqtt.music_lights(loc, 'green', GREEN))
+    button_UR.press_func(lambda: mqtt.music_lights(loc, 'blue', BLUE))
+    button_LR.press_func(lambda: mqtt.music_lights(loc, 'white', WHITE))
 
-    button_UL.long_func(lambda: mqtt.lights(['Brian'], 'turn_off'))
-    button_LL.long_func(lambda: mqtt.lights(['Brian'], 'turn_on', WHITE))
-    button_UR.long_func(lambda: mqtt.lights(['Brian'], 'turn_on', GREEN))
-    button_LR.long_func(lambda: mqtt.lights(['Brian'], 'turn_on', RED))
+    button_UL.long_func(lambda: mqtt.lights(loc, 'turn_off'))
+    button_LL.long_func(lambda: mqtt.lights(loc, 'turn_on', WHITE))
+    button_UR.long_func(lambda: timer.execute(loc, 10))
+    button_LR.long_func(lambda: timer.execute(loc, 15))
 
+    lights.clear()
     loop = asyncio.get_event_loop()
     loop.create_task(mqtt.connect())
 
