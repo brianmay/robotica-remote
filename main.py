@@ -180,14 +180,23 @@ class Lights:
         loop.create_task(self.flash(self._taskid, color, 0.2))
 
     def set_timer(self, minutes: int) -> None:
-        self._np.fill((0, 0, 0))
         colors = [ (7,0,0), (0,7,0), (0,0,7) ]  # type: List[Color]
-        num_lights = ((minutes - 1) % self._np.n) + 1
-        num_cycles = ((minutes - 1) // self._np.n)
+        num_lights = (minutes % self._np.n)
+        num_cycles = (minutes // self._np.n)
+
         if num_cycles > len(colors)-1:
-            num_cycles = len(colors)-1
+            fg = (7,7,7)
+        else:
+            fg = colors[num_cycles]
+
+        if num_cycles == 0:
+            bg = (0,0,0)
+        else:
+            bg = colors[num_cycles-1]
+
+        self._np.fill(bg)
         for i in range(num_lights):
-            self._np[i] = colors[num_cycles]
+            self._np[i] = fg
         self._np.write()
 
     async def rotate(self, taskid: int, color: Color, delay: float) -> None:
