@@ -1,4 +1,5 @@
 import json
+import math
 
 import uasyncio as asyncio
 import utime as time
@@ -370,10 +371,12 @@ class MQTT:
         }
         await self._publish("/execute/", data)
 
-    async def music(self, locations: List[str], play_list: str):
-        action = {
-            "music": {"play_list": play_list},
-        }
+    async def music(self, locations: List[str], play_list: Optional[str]):
+        action = {}  # type: Dict[str, Any]
+        if play_list is not None:
+            action["music"] = {"play_list": play_list}
+        else:
+            action["music"] = None
         data = {
             "locations": locations,
             "actions": [action],
@@ -381,12 +384,15 @@ class MQTT:
         await self._publish("/execute/", data)
 
     async def music_lights(
-            self, locations: List[str], play_list: str,
-            color: Dict[str, int]):
+            self, locations: List[str],
+            play_list: Optional[str], color: Dict[str, int]):
         action = {
-            "music": {"play_list": play_list},
             "lights": {"action": "turn_on", "color": color},
-        }
+            }  # type: Dict[str, Any]
+        if play_list is not None:
+            action["music"] = {"play_list": play_list}
+        else:
+            action["music"] = None
         data = {
             "locations": locations,
             "actions": [action],
@@ -410,21 +416,29 @@ class Timer:
             return
 
         self._timer_running = True
-        timer_stop = time.ticks_add(loop.time(), minutes*60000 - 2000)
+        last_flash_time = 2000
+        one_minute = 60000
+        timer_stop = time.ticks_add(
+            loop.time(), minutes*one_minute - last_flash_time)
         try:
             print("Timer started at %d minutes." % minutes)
             await self._mqtt.say(locations, "Timer started at %d minutes." % minutes)
 
+            last_minute = minutes
             twait = time.ticks_diff(timer_stop, loop.time())
             while twait > 0:
-                minute = twait // 60000 + 1
+                minute = math.ceil(twait / one_minute)
                 print("Timer left %d minutes of %d." % (minute, minutes))
                 await self._lights.set_timer(minute)
-                await self._mqtt.sound(locations, "beep")
+                if minute != last_minute:
+                    await self._mqtt.sound(locations, "beep")
+                    last_minute = minute
 
                 twait = time.ticks_diff(timer_stop, loop.time())
-                sleep = (twait % 60000)/1000 + 1
-                await asyncio.sleep(sleep)
+                sleep = twait % one_minute
+                if sleep == 0:
+                    sleep = one_minute
+                await asyncio.sleep_ms(sleep)
                 twait = time.ticks_diff(timer_stop, loop.time())
 
             print("Timer stopped %d minutes." % minutes)
@@ -454,16 +468,43 @@ def main() -> None:
     button_UR = Button(pin_UR)
     button_LR = Button(pin_LR)
 
-    loc = ['Brian']
-    button_UL.press_func(lambda: mqtt.music_lights(loc, 'red', RED))
-    button_LL.press_func(lambda: mqtt.music_lights(loc, 'green', GREEN))
-    button_UR.press_func(lambda: mqtt.music_lights(loc, 'blue', BLUE))
-    button_LR.press_func(lambda: mqtt.music_lights(loc, 'white', WHITE))
+    loc1 = ['Brian']
+    current_play_list = None  # type: Optional[str]
+    current_color = None  # type: Optional[Dict[str, int]]
 
-    button_UL.long_func(lambda: mqtt.lights(loc, 'turn_off'))
-    button_LL.long_func(lambda: mqtt.lights(loc, 'turn_on', WHITE))
-    button_UR.long_func(lambda: timer.execute(loc, 10))
-    button_LR.long_func(lambda: timer.execute(loc, 15))
+    async def button_press(play_list: str) -> None:
+        nonlocal current_play_list
+        if current_play_list != play_list:
+            await mqtt.music(loc1, play_list)
+            current_play_list = play_list
+        else:
+            await mqtt.music(loc1, None)
+            current_play_list = None
+
+    async def button_long(color: Dict[str, int]) -> None:
+        nonlocal current_color
+        if current_color != color:
+            await mqtt.lights(loc1, 'turn_on', color)
+            current_color = color
+        else:
+            await mqtt.lights(loc1, 'turn_off', color)
+            current_color = None
+
+    button_UL.press_func(lambda: button_press('red'))
+    button_LL.press_func(lambda: button_press('green'))
+    button_UR.press_func(lambda: button_press('blue'))
+    button_LR.press_func(lambda: button_press('white'))
+
+    button_UL.long_func(lambda: button_long(RED))
+    button_LL.long_func(lambda: button_long(GREEN))
+    button_UR.long_func(lambda: button_long(BLUE))
+    button_LR.long_func(lambda: button_long(WHITE))
+
+    loc2 = ['Brian']
+    button_UL.double_func(lambda: timer.execute(loc2, 5))
+    button_LL.double_func(lambda: timer.execute(loc2, 10))
+    button_UR.double_func(lambda: timer.execute(loc2, 15))
+    button_LR.double_func(lambda: timer.execute(loc2, 20))
 
     lights.clear()
     loop = asyncio.get_event_loop()
