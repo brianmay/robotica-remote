@@ -360,6 +360,16 @@ class MQTT:
         }
         await self._publish("/execute/", data)
 
+    async def sound(self, locations: List[str], sound: str):
+        action = {
+            "sound": {"name": sound},
+        }
+        data = {
+            "locations": locations,
+            "actions": [action],
+        }
+        await self._publish("/execute/", data)
+
     async def music(self, locations: List[str], play_list: str):
         action = {
             "music": {"play_list": play_list},
@@ -410,6 +420,7 @@ class Timer:
                 minute = twait // 60000 + 1
                 print("Timer left %d minutes of %d." % (minute, minutes))
                 await self._lights.set_timer(minute)
+                await self._mqtt.sound(locations, "beep")
 
                 twait = time.ticks_diff(timer_stop, loop.time())
                 sleep = (twait % 60000)/1000 + 1
