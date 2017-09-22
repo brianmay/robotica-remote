@@ -430,7 +430,7 @@ class Timer:
             print("Timer stopped %d minutes." % minutes)
             await self._lights.set_timer(0)
             self._lights.clear()
-            await self._mqtt.say(locations, "The time is up!")
+            await self._mqtt.say(locations, "Beep. Beep. Beep. The time is up!")
         except Exception as e:
             print("Timer encountered as error: %s" % e)
             self._lights.clear()
