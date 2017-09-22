@@ -182,19 +182,23 @@ class Lights:
         loop.create_task(self.flash(self._taskid, color, 0.2))
 
     def _set_timer(self, minutes: int) -> None:
-        colors = [ (7,0,0), (0,7,0), (0,0,7) ]  # type: List[Color]
+        colors = [ (1,0,0), (0,1,0), (0,0,1) ]  # type: List[Color]
         num_lights = (minutes % self._np.n)
         num_cycles = (minutes // self._np.n)
 
         if num_cycles > len(colors)-1:
-            fg = (7,7,7)
+            fg = (1,1,1)
         else:
             fg = colors[num_cycles]
 
         if num_cycles == 0:
             bg = (0,0,0)
         else:
-            bg = colors[num_cycles-1]
+            prev_cycles = num_cycles - 1
+            if prev_cycles > len(colors)-1:
+                bg = (1,1,0)
+            else:
+                bg = colors[prev_cycles]
 
         self._np.fill(bg)
         for i in range(num_lights):
