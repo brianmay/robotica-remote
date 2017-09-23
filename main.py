@@ -182,21 +182,21 @@ class Lights:
         loop.create_task(self.flash(self._taskid, color, 0.2))
 
     def _set_timer(self, minutes: int) -> None:
-        colors = [ (1,0,0), (0,1,0), (0,0,1) ]  # type: List[Color]
+        colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # type: List[Color]
         num_lights = (minutes % self._np.n)
         num_cycles = (minutes // self._np.n)
 
         if num_cycles > len(colors)-1:
-            fg = (1,1,1)
+            fg = (1, 1, 1)
         else:
             fg = colors[num_cycles]
 
         if num_cycles == 0:
-            bg = (0,0,0)
+            bg = (0, 0, 0)
         else:
             prev_cycles = num_cycles - 1
             if prev_cycles > len(colors)-1:
-                bg = (1,1,0)
+                bg = (1, 1, 0)
             else:
                 bg = colors[prev_cycles]
 
@@ -426,7 +426,8 @@ class Timer:
             loop.time(), minutes*one_minute - last_flash_time)
         try:
             print("Timer started at %d minutes." % minutes)
-            await self._mqtt.say(locations, "Timer started at %d minutes." % minutes)
+            await self._mqtt.say(
+                locations, "Timer started at %d minutes." % minutes)
 
             last_minute = minutes
             twait = time.ticks_diff(timer_stop, loop.time())
@@ -448,7 +449,8 @@ class Timer:
             print("Timer stopped %d minutes." % minutes)
             await self._lights.set_timer(0)
             self._lights.clear()
-            await self._mqtt.say(locations, "Beep. Beep. Beep. The time is up!")
+            await self._mqtt.say(
+                locations, "Beep. Beep. Beep. The time is up!")
         except Exception as e:
             print("Timer encountered as error: %s" % e)
             self._lights.clear()

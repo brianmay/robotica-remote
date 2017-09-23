@@ -39,7 +39,11 @@ class Response:
         return ujson.loads(await self.content())
 
 
-async def request(method: str, url: str, data: Optional[bytes]=None, json: Any=None, headers: Dict[str,str]={}, stream: Optional[IO[bytes]]=None) -> Response:
+async def request(
+        method: str, url: str,
+        data: Optional[bytes]=None, json: Any=None,
+        headers: Dict[str, str]={},
+        stream: Optional[IO[bytes]]=None) -> Response:
     try:
         proto, dummy, host, path = url.split("/", 3)
     except ValueError:

@@ -1,0 +1,15 @@
+# Config file for automatic testing at travis-ci.org
+# This file will be regenerated if you run travis_pypi_setup.py
+
+language: python
+python:
+  - 3.6
+
+# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+install:
+  - pip install -rrequirements/tests.txt
+
+# command to run tests, e.g. python setup.py test
+script:
+  - flake8 arequests.py main.py
+  - mypy --strict --ignore-missing-imports main.py
