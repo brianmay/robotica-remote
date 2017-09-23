@@ -11,5 +11,5 @@ install:
 
 # command to run tests, e.g. python setup.py test
 script:
-  - flake8 arequests.py main.py
-  - mypy --strict --ignore-missing-imports main.py
+  - flake8 src
+  - mypy --strict --ignore-missing-imports src

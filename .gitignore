@@ -1,4 +1,4 @@
-/boot.py
-/config.py
+/src/boot.py
+/src/config.py
 /build
 /.mypy_cache

@@ -78,8 +78,8 @@ Ready to contribute? Here's how to set up `robotica-remote` for local developmen
 
 5. When you're done making changes, check that your changes pass flake8 and the tests, including testing other Python versions with tox::
 
-    $ flake8 main.py
-    $ mypy --strict --ignore-missing-imports main.py
+    $ flake8 src
+    $ mypy --strict --ignore-missing-imports src
 
 
    To get flake8 and tox, just pip install them into your virtualenv.

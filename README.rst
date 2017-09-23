@@ -21,8 +21,8 @@ control.
 Installation
 ------------
 
-#. Create empty ``./boot.py`` file.
-#. Create ``./config.py``::
+#. Create empty ``src/boot.py`` file.
+#. Create ``src/config.py``::
 
     from mqtt_as import config
     from sys import platform
