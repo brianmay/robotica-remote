@@ -1,3 +1,5 @@
+# File copied from urequests.py from micropython-esp32 tree.
+
 import uasyncio as asyncio
 
 try:

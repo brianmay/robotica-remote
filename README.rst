@@ -46,3 +46,4 @@ This software is GPLv3, with the exception of third party software, which
 keep their original copyrights and licenses.
 
 * ``arequests.py``: Derived from ``urequests.py`` in micropython-esp32 tree.
+  Has MIT License.
