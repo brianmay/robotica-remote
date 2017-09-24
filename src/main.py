@@ -528,7 +528,7 @@ def main() -> None:
     button_UL.double_func(lambda: timer.execute(loc2, 5))
     button_LL.double_func(lambda: timer.execute(loc2, 10))
     button_UR.double_func(lambda: timer.execute(loc2, 15))
-    button_LR.double_func(lambda: timer.execute(loc2, 20))
+    button_LR.double_func(lambda: timer.execute(loc2, 30))
 
     lights.set_boot()
 
