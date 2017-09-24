@@ -200,15 +200,16 @@ class LightsState:
             self[i] = fg
         self.write()
 
-    async def set_timer(self, minutes: int) -> None:
-        self._set_timer(minutes)
-        await asyncio.sleep(0.5)
-        self._set_timer(minutes + 1)
-        await asyncio.sleep(0.5)
-        self._set_timer(minutes)
-        await asyncio.sleep(0.5)
-        self._set_timer(minutes + 1)
-        await asyncio.sleep(0.5)
+    async def set_timer(self, minutes: int, no_flash: bool=False) -> None:
+        if not no_flash:
+            self._set_timer(minutes)
+            await asyncio.sleep(0.5)
+            self._set_timer(minutes + 1)
+            await asyncio.sleep(0.5)
+            self._set_timer(minutes)
+            await asyncio.sleep(0.5)
+            self._set_timer(minutes + 1)
+            await asyncio.sleep(0.5)
         self._set_timer(minutes)
 
 
@@ -449,10 +450,12 @@ class Timer:
             while twait > 0:
                 minute = math.ceil(twait / one_minute)
                 print("Timer left %d minutes of %d." % (minute, minutes))
-                await state.set_timer(minute)
                 if minute != last_minute:
+                    await state.set_timer(minute, no_flash=False)
                     await self._mqtt.sound(locations, "beep")
                     last_minute = minute
+                else:
+                    await state.set_timer(minute, no_flash=True)
 
                 twait = time.ticks_diff(timer_stop, loop.time())
                 sleep = twait % one_minute
