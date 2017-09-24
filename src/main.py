@@ -7,7 +7,6 @@ import asyn
 import aswitch
 import machine
 import neopixel
-import arequests
 
 from mqtt_as import MQTTClient
 from config import config
@@ -272,32 +271,6 @@ class Lights:
                 self._task_initial = None
 
 
-async def do_http() -> None:
-    url = "http://dining.pri:8080/execute/"
-    json = {
-        "locations": ["Brian", "Dining", "Twins", "Akira"],
-        "actions": [
-            {
-                "message": {"text": "It is time to watch Fergus."}
-            },
-            # {
-            #     "message": {"text": "It is time to watch the lights flash"}
-            # },
-            # {
-            #     "lights": {"action": "flash"}
-            # }
-        ]
-    }
-    headers = {
-        'ACCEPT': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': 'Basic YWRtaW46cTF3MmUzcjQ=',
-    }
-    response = await arequests.request("POST", url, json=json, headers=headers)
-    print(response)
-    print(await response.content())
-    if response.status_code == 200:
-        print(await response.json())
 
 
 class MQTT:
