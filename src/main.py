@@ -60,7 +60,7 @@ def launch(func: Optional[Callback]) -> None:
 
 class Button:
     debounce_ms = 50
-    double_click_ms = 400
+    double_click_ms = 500
 
     def __init__(self, pin: machine.Pin) -> None:
         self.pin = pin  # Initialise for input
