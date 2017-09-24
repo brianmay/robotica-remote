@@ -464,8 +464,8 @@ class Timer:
                 await asyncio.sleep_ms(sleep)
                 twait = time.ticks_diff(timer_stop, loop.time())
 
-            print("Timer stopped %d minutes." % minutes)
             await state.set_timer(0)
+            print("Timer stopped %d minutes." % minutes)
             await self._mqtt.say(
                 locations, "Beep. Beep. Beep. The time is up!")
         except Exception as e:
