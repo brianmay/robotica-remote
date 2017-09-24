@@ -146,44 +146,38 @@ class Button:
             self._event.clear()
 
 
-class Lights:
-    def __init__(self, pin: machine.Pin) -> None:
-        self._pin = pin  # Initialise for input
-        self._np = neopixel.NeoPixel(pin, NUM_LIGHTS, timing=True)
-        self._taskid = 0
-        self._task_initial = None  # type: Optional[List[Color]]
+class LightsState:
+    def __init__(
+            self, num_lights: int,
+            write_func: Callable[['LightsState'], None]) -> None:
+        self._n = num_lights
+        self._buf = [(0, 0, 0)] * num_lights  # type: List[Color]
+        self._write_func = write_func
 
-    def get_state(self) -> List[Color]:
-        return [
-            self._np[i]
-            for i in range(self._np.n)
-            ]
-
-    def set_state(self, colors: List[Color]) -> None:
-        for i, color in enumerate(colors):
-            self._np[i] = color
-        self._np.write()
+    def fill(self, color: Color) -> None:
+        for i in range(self._n):
+            self._buf[i] = color
 
     def clear(self) -> None:
-        self._np.fill((0, 0, 0))
-        self._np.write()
+        self.fill((0, 0, 0))
 
-    def set_ok(self) -> None:
-        loop = asyncio.get_event_loop()
-        color = (0, 31, 0)
-        self._taskid = self._taskid + 1
-        loop.create_task(self.flash(self._taskid, color, 0.2))
+    @property
+    def n(self) -> int:
+        return self._n
 
-    def set_danger(self) -> None:
-        loop = asyncio.get_event_loop()
-        color = (31, 0, 0)
-        self._taskid = self._taskid + 1
-        loop.create_task(self.flash(self._taskid, color, 0.2))
+    def __getitem__(self, index: int) -> Color:
+        return self._buf[index]
+
+    def __setitem__(self, index: int, value: Color) -> None:
+        self._buf[index] = value
+
+    def write(self) -> None:
+        self._write_func(self)
 
     def _set_timer(self, minutes: int) -> None:
         colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # type: List[Color]
-        num_lights = (minutes % self._np.n)
-        num_cycles = (minutes // self._np.n)
+        num_lights = (minutes % self._n)
+        num_cycles = (minutes // self._n)
 
         if num_cycles > len(colors)-1:
             fg = (1, 1, 1)
@@ -199,10 +193,10 @@ class Lights:
             else:
                 bg = colors[prev_cycles]
 
-        self._np.fill(bg)
+        self.fill(bg)
         for i in range(num_lights):
-            self._np[i] = fg
-        self._np.write()
+            self._buf[i] = fg
+        self.write()
 
     async def set_timer(self, minutes: int) -> None:
         self._set_timer(minutes)
@@ -215,62 +209,113 @@ class Lights:
         await asyncio.sleep(0.5)
         self._set_timer(minutes)
 
-    async def rotate(self, taskid: int, color: Color, delay: float) -> None:
+
+class Lights:
+    def __init__(self, pin: machine.Pin) -> None:
+        self._pin = pin  # Initialise for input
+        self._np = neopixel.NeoPixel(pin, NUM_LIGHTS, timing=True)
+        self._task_id = 0
+        self._task_name = None  # type: Optional[str]
+        self._task_running = False
+        self._task_state = LightsState(NUM_LIGHTS, self._write_task)
+        self._state = LightsState(NUM_LIGHTS, self._write)
+
+    @property
+    def state(self) -> LightsState:
+        return self._state
+
+    def _write(self, state: LightsState) -> None:
+        if not self._task_running:
+            for i in range(min(self._np.n, state.n)):
+                self._np[i] = state[i]
+            self._np.write()
+
+    def _write_task(self, state: LightsState) -> None:
+        if self._task_running:
+            for i in range(min(self._np.n, state.n)):
+                self._np[i] = state[i]
+            self._np.write()
+
+    def set_ok(self) -> None:
+        loop = asyncio.get_event_loop()
+        color = (0, 31, 0)
+        self._task_id = self._task_id + 1
+        self._task_name = "ok"
+        loop.create_task(self.flash(self._task_id, color, 0.2))
+
+    def set_danger(self) -> None:
+        loop = asyncio.get_event_loop()
+        color = (31, 0, 0)
+        self._task_id = self._task_id + 1
+        self._task_name = "danger"
+        loop.create_task(self.flash(self._task_id, color, 0.2))
+
+    def set_boot(self) -> None:
+        loop = asyncio.get_event_loop()
+        color = (1, 0, 0)
+        self._task_id = self._task_id + 1
+        self._task_name = "boot"
+        loop.create_task(self.rotate(self._task_id, color, 0.2))
+
+    def stop_boot(self) -> None:
+        if self._task_name == "boot":
+            self._task_id = self._task_id + 1
+            self._task_running = False
+            self._state.write()
+
+    async def rotate(self, task_id: int, color: Color, delay: float) -> None:
         i = 0
         n = 1
-        if self._task_initial is None:
-            self._task_initial = self.get_state()
+        self._task_running = True
+        state = self._task_state
 
         try:
             for repeat in range(int(10 / delay)):
-                np = self._np
-
-                np.fill((0, 0, 0))
-                np[(i + 0) % np.n] = color
-                np[(i + 1) % np.n] = color
-                np[(i + 2) % np.n] = color
-                np[(i + 3) % np.n] = color
-
-                np.write()
+                state.fill((0, 0, 0))
+                state[(i + 0) % state.n] = color
+                state[(i + 1) % state.n] = color
+                state[(i + 2) % state.n] = color
+                state[(i + 3) % state.n] = color
+                state.write()
 
                 await asyncio.sleep(delay)
-                if self._taskid != taskid:
+                if self._task_id != task_id:
                     # another task running, just exit
                     return
 
-                i = (i + 1*n) % np.n
+                i = (i + 1*n) % state.n
         finally:
-            if self._taskid == taskid:
-                self.set_state(self._task_initial)
-                self._task_initial = None
+            if self._task_id == task_id:
+                self._task_running = False
+                self._task_name = None
+                self._state.write()
 
-    async def flash(self, taskid: int, color: Color, delay: float) -> None:
-        if self._task_initial is None:
-            self._task_initial = self.get_state()
+    async def flash(self, task_id: int, color: Color, delay: float) -> None:
+        self._task_running = True
+        state = self._task_state
+
         try:
             for repeat in range(4):
-                np = self._np
-
-                np.fill(color)
-                np.write()
+                state.fill(color)
+                state.write()
 
                 await asyncio.sleep(delay)
-                if self._taskid != taskid:
+                if self._task_id != task_id:
                     # another task running, just exit
                     return
 
-                self.clear()
+                state.clear()
+                state.write()
 
                 await asyncio.sleep(delay)
-                if self._taskid != taskid:
+                if self._task_id != task_id:
                     # another task running, just exit
                     return
         finally:
-            if self._taskid == taskid:
-                self.set_state(self._task_initial)
-                self._task_initial = None
-
-
+            if self._task_id == task_id:
+                self._task_running = False
+                self._task_name = None
+                self._state.write()
 
 
 class MQTT:
@@ -303,6 +348,7 @@ class MQTT:
 
     async def connect(self) -> None:
         await self._client.connect()
+        self._lights.stop_boot()
 
     def close(self) -> None:
         self._client.close()
@@ -386,6 +432,7 @@ class Timer:
 
     async def execute(self, locations: List[str], minutes: int):
         loop = asyncio.get_event_loop()
+        state = self._lights.state
 
         if self._timer_running:
             await self._mqtt.say(locations, "Timer is already set.")
@@ -407,7 +454,7 @@ class Timer:
             while twait > 0:
                 minute = math.ceil(twait / one_minute)
                 print("Timer left %d minutes of %d." % (minute, minutes))
-                await self._lights.set_timer(minute)
+                await state.set_timer(minute)
                 if minute != last_minute:
                     await self._mqtt.sound(locations, "beep")
                     last_minute = minute
@@ -420,13 +467,13 @@ class Timer:
                 twait = time.ticks_diff(timer_stop, loop.time())
 
             print("Timer stopped %d minutes." % minutes)
-            await self._lights.set_timer(0)
-            self._lights.clear()
+            await state.set_timer(0)
             await self._mqtt.say(
                 locations, "Beep. Beep. Beep. The time is up!")
         except Exception as e:
             print("Timer encountered as error: %s" % e)
-            self._lights.clear()
+            state.clear()
+            state.write()
             await self._mqtt.say(locations, "The timer crashed!")
         finally:
             self._timer_running = False
@@ -485,7 +532,8 @@ def main() -> None:
     button_UR.double_func(lambda: timer.execute(loc2, 15))
     button_LR.double_func(lambda: timer.execute(loc2, 20))
 
-    lights.clear()
+    lights.set_boot()
+
     loop = asyncio.get_event_loop()
     loop.create_task(mqtt.connect())
 
