@@ -148,15 +148,15 @@ class Button:
 
 class LightsState:
     def __init__(
-            self, num_lights: int,
-            write_func: Callable[['LightsState'], None]) -> None:
+            self, pin: machine.Pin, num_lights: int,
+            write_ok_func: Callable[['LightsState'], bool]) -> None:
+        self._np = neopixel.NeoPixel(pin, NUM_LIGHTS, timing=True)
         self._n = num_lights
-        self._buf = [(0, 0, 0)] * num_lights  # type: List[Color]
-        self._write_func = write_func
+        self._write_ok_func = write_ok_func
 
     def fill(self, color: Color) -> None:
         for i in range(self._n):
-            self._buf[i] = color
+            self[i] = color
 
     def clear(self) -> None:
         self.fill((0, 0, 0))
@@ -166,13 +166,15 @@ class LightsState:
         return self._n
 
     def __getitem__(self, index: int) -> Color:
-        return self._buf[index]
+        color = self._np[index]  # type: Color
+        return color
 
     def __setitem__(self, index: int, value: Color) -> None:
-        self._buf[index] = value
+        self._np[index] = value
 
     def write(self) -> None:
-        self._write_func(self)
+        if self._write_ok_func(self):
+            self._np.write()
 
     def _set_timer(self, minutes: int) -> None:
         colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # type: List[Color]
@@ -195,7 +197,7 @@ class LightsState:
 
         self.fill(bg)
         for i in range(num_lights):
-            self._buf[i] = fg
+            self[i] = fg
         self.write()
 
     async def set_timer(self, minutes: int) -> None:
@@ -213,28 +215,21 @@ class LightsState:
 class Lights:
     def __init__(self, pin: machine.Pin) -> None:
         self._pin = pin  # Initialise for input
-        self._np = neopixel.NeoPixel(pin, NUM_LIGHTS, timing=True)
         self._task_id = 0
         self._task_name = None  # type: Optional[str]
         self._task_running = False
-        self._task_state = LightsState(NUM_LIGHTS, self._write_task)
-        self._state = LightsState(NUM_LIGHTS, self._write)
+        self._task_state = LightsState(pin, NUM_LIGHTS, self._write_task_ok)
+        self._state = LightsState(pin, NUM_LIGHTS, self._write_ok)
 
     @property
     def state(self) -> LightsState:
         return self._state
 
-    def _write(self, state: LightsState) -> None:
-        if not self._task_running:
-            for i in range(min(self._np.n, state.n)):
-                self._np[i] = state[i]
-            self._np.write()
+    def _write_ok(self, state: LightsState) -> bool:
+        return not self._task_running
 
-    def _write_task(self, state: LightsState) -> None:
-        if self._task_running:
-            for i in range(min(self._np.n, state.n)):
-                self._np[i] = state[i]
-            self._np.write()
+    def _write_task_ok(self, state: LightsState) -> bool:
+        return self._task_running
 
     def set_ok(self) -> None:
         loop = asyncio.get_event_loop()
