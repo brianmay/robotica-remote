@@ -19,7 +19,7 @@ except ImportError:
     pass
 
 MQTT_SERVER = '192.168.3.6'  # Change to suit e.g. 'iot.eclipse.org'
-NUM_LIGHTS = 12
+NUM_LIGHTS = 16
 
 WHITE = {
     'hue': 0,
