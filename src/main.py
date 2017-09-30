@@ -1,8 +1,6 @@
 import json
-import math
 
 import uasyncio as asyncio
-import utime as time
 import asyn
 import aswitch
 import machine
@@ -323,9 +321,22 @@ class MQTT:
         MQTTClient.DEBUG = True  # Optional: print diagnostic messages
         self._client = MQTTClient(config)
 
-    def _process(self, topic: str, data: Any) -> None:
+    async def _process(self, topic: str, data: Any) -> None:
         if topic.startswith('/action/Brian/'):
             print((topic, data))
+            if 'timer_warn' in data:
+                timer = data['timer_warn']
+                await self._lights.state.set_timer(
+                    minutes=timer['time_left'],
+                    no_flash=False,
+                )
+            if 'timer_status' in data:
+                timer = data['timer_status']
+                if timer['time_left'] == timer['time_total']:
+                    await self._lights.state.set_timer(
+                        minutes=timer['time_left'],
+                        no_flash=True,
+                    )
             if 'message' in data:
                 self._lights.set_ok()
 
@@ -335,8 +346,10 @@ class MQTT:
 
         try:
             data = json.loads(msg_str)
-            self._process(topic_str, data)
-        except json.JSONDecodeError as e:
+            coro = self._process(topic_str, data)
+            loop = asyncio.get_event_loop()
+            loop.create_task(coro)
+        except ValueError as e:
             print("JSON Error %s" % e)
 
     async def _conn_han(self, client: MQTTClient) -> None:
@@ -418,69 +431,35 @@ class MQTT:
         }
         await self._publish("/execute/", data)
 
-
-class Timer:
-
-    def __init__(self, lights: Lights, mqtt: MQTT) -> None:
-        self._lights = lights
-        self._mqtt = mqtt
-        self._timer_running = False
-
-    async def execute(self, locations: List[str], minutes: int):
-        loop = asyncio.get_event_loop()
-        state = self._lights.state
-
-        if self._timer_running:
-            await self._mqtt.say(locations, "Timer is already set.")
-            print("Timer is already set.")
-            return
-
-        self._timer_running = True
-        last_flash_time = 2000
-        one_minute = 60000
-        timer_stop = time.ticks_add(
-            loop.time(), minutes*one_minute - last_flash_time)
-        try:
-            print("Timer started at %d minutes." % minutes)
-            await self._mqtt.say(
-                locations, "Timer started at %d minutes." % minutes)
-
-            last_minute = minutes
-            twait = time.ticks_diff(timer_stop, loop.time())
-            while twait > 0:
-                minute = math.ceil(twait / one_minute)
-                print("Timer left %d minutes of %d." % (minute, minutes))
-                if minute != last_minute:
-                    await state.set_timer(minute, no_flash=False)
-                    await self._mqtt.sound(locations, "beep")
-                    last_minute = minute
-                else:
-                    await state.set_timer(minute, no_flash=True)
-
-                twait = time.ticks_diff(timer_stop, loop.time())
-                sleep = twait % one_minute
-                if sleep == 0:
-                    sleep = one_minute
-                await asyncio.sleep_ms(sleep)
-                twait = time.ticks_diff(timer_stop, loop.time())
-
-            await state.set_timer(0)
-            print("Timer stopped %d minutes." % minutes)
-            await self._mqtt.say(
-                locations, "Beep. Beep. Beep. The time is up!")
-        except Exception as e:
-            print("Timer encountered as error: %s" % e)
-            state.clear()
-            state.write()
-            await self._mqtt.say(locations, "The timer crashed!")
-        finally:
-            self._timer_running = False
+    async def timer(self, locations: List[str], minutes: int):
+        actions = [
+            {
+                "message": {
+                    "text": "The timer is starting at %d minutes." % minutes,
+                },
+            },
+            {
+                "timer": {
+                    "name": "default",
+                    "minutes": minutes,
+                },
+            },
+            {
+                "message": {
+                    "text": "Beep beep beep. The time is up.",
+                },
+            }
+        ]
+        data = {
+            "locations": locations,
+            "actions": actions,
+        }
+        await self._publish("/execute/", data)
 
 
 def main() -> None:
     lights = Lights(machine.Pin(13))
     mqtt = MQTT(MQTT_SERVER, lights)
-    timer = Timer(lights, mqtt)
 
     pin_UL = machine.Pin(25, machine.Pin.IN, machine.Pin.PULL_UP)
     pin_LL = machine.Pin(26, machine.Pin.IN, machine.Pin.PULL_UP)
@@ -524,11 +503,11 @@ def main() -> None:
     button_UR.long_func(lambda: button_long(BLUE))
     button_LR.long_func(lambda: button_long(WHITE))
 
-    loc2 = ['Brian']
-    button_UL.double_func(lambda: timer.execute(loc2, 5))
-    button_LL.double_func(lambda: timer.execute(loc2, 10))
-    button_UR.double_func(lambda: timer.execute(loc2, 15))
-    button_LR.double_func(lambda: timer.execute(loc2, 30))
+    loc2 = ['Dining', 'Twins', 'Brian']
+    button_UL.double_func(lambda: mqtt.timer(loc2, 5))
+    button_LL.double_func(lambda: mqtt.timer(loc2, 10))
+    button_UR.double_func(lambda: mqtt.timer(loc2, 15))
+    button_LR.double_func(lambda: mqtt.timer(loc2, 30))
 
     lights.set_boot()
 
