@@ -147,10 +147,19 @@ class Button:
 class LightsState:
     def __init__(
             self, pin: machine.Pin, num_lights: int,
-            write_ok_func: Callable[['LightsState'], bool]) -> None:
+            write_ok_func: Callable[['LightsState'], bool],
+            stop_func: Callable[['LightsState'], None]) -> None:
         self._np = neopixel.NeoPixel(pin, NUM_LIGHTS, timing=True)
         self._n = num_lights
         self._write_ok_func = write_ok_func
+        self._stop_func = stop_func
+        self._cancel = False
+
+    def cancel(self) -> None:
+        self._cancel = True
+
+    def stop(self) -> None:
+        self._stop_func(self)
 
     def fill(self, color: Color) -> None:
         for i in range(self._n):
@@ -169,6 +178,9 @@ class LightsState:
 
     def __setitem__(self, index: int, value: Color) -> None:
         self._np[index] = value
+
+    def __str__(self) -> str:
+        return ",".join(str(self._np[index]) for index in range(self._n))
 
     def write(self) -> None:
         if self._write_ok_func(self):
@@ -209,112 +221,116 @@ class LightsState:
             self._set_timer(minutes + 1)
             await asyncio.sleep(0.5)
         self._set_timer(minutes)
+        # we don't call stop here as display expected to continue
+
+    async def rotate(self, color: Color, delay: float) -> None:
+        i = 0
+        n = 1
+
+        try:
+            for repeat in range(int(10 / delay)):
+                self.fill((0, 0, 0))
+                self[(i + 0) % self.n] = color
+                self[(i + 1) % self.n] = color
+                self[(i + 2) % self.n] = color
+                self[(i + 3) % self.n] = color
+                self.write()
+
+                await asyncio.sleep(delay)
+                if self._cancel:
+                    break
+
+                i = (i + 1*n) % self.n
+        finally:
+            # self.clear()
+            # self.write()
+            self.stop()
+
+    async def flash(self, color: Color, delay: float) -> None:
+        try:
+            for repeat in range(4):
+                self.fill(color)
+                self.write()
+
+                await asyncio.sleep(delay)
+                if self._cancel:
+                    break
+
+                self.clear()
+                self.write()
+
+                await asyncio.sleep(delay)
+                if self._cancel:
+                    break
+        finally:
+            # self.clear()
+            # self.write()
+            self.stop()
+
+    def set_ok(self) -> None:
+        loop = asyncio.get_event_loop()
+        color = (0, 31, 0)
+        loop.create_task(self.flash(color, 0.2))
+
+    def set_danger(self) -> None:
+        loop = asyncio.get_event_loop()
+        color = (31, 0, 0)
+        loop.create_task(self.flash(color, 0.2))
+
+    def set_boot(self) -> None:
+        loop = asyncio.get_event_loop()
+        color = (1, 0, 0)
+        loop.create_task(self.rotate(color, 0.2))
 
 
 class Lights:
     def __init__(self, pin: machine.Pin) -> None:
         self._pin = pin  # Initialise for input
-        self._task_id = 0
-        self._task_name = None  # type: Optional[str]
-        self._task_running = False
-        self._task_state = LightsState(pin, NUM_LIGHTS, self._write_task_ok)
-        self._state = LightsState(pin, NUM_LIGHTS, self._write_ok)
+        self._bg_task = None  # type: Optional[LightsState]
+        self._fg_task = None  # type: Optional[LightsState]
+        self._current_task = None  # type: Optional[LightsState]
 
-    @property
-    def state(self) -> LightsState:
-        return self._state
+    def get_bg_task(self) -> LightsState:
+        if self._bg_task is not None:
+            self._bg_task.cancel()
+        self._bg_task = LightsState(
+            self._pin, NUM_LIGHTS, self._write_task_ok, self._stop_task)
+        if self._fg_task is None:
+            self._current_task = self._bg_task
+        return self._bg_task
 
-    def _write_ok(self, state: LightsState) -> bool:
-        return not self._task_running
+    def get_fg_task(self) -> LightsState:
+        if self._fg_task is not None:
+            self._fg_task.cancel()
+        self._fg_task = LightsState(
+            self._pin, NUM_LIGHTS, self._write_task_ok, self._stop_task)
+        self._current_task = self._fg_task
+        return self._fg_task
 
     def _write_task_ok(self, state: LightsState) -> bool:
-        return self._task_running
+        return state is self._current_task
 
-    def set_ok(self) -> None:
-        loop = asyncio.get_event_loop()
-        color = (0, 31, 0)
-        self._task_id = self._task_id + 1
-        self._task_name = "ok"
-        loop.create_task(self.flash(self._task_id, color, 0.2))
-
-    def set_danger(self) -> None:
-        loop = asyncio.get_event_loop()
-        color = (31, 0, 0)
-        self._task_id = self._task_id + 1
-        self._task_name = "danger"
-        loop.create_task(self.flash(self._task_id, color, 0.2))
-
-    def set_boot(self) -> None:
-        loop = asyncio.get_event_loop()
-        color = (1, 0, 0)
-        self._task_id = self._task_id + 1
-        self._task_name = "boot"
-        loop.create_task(self.rotate(self._task_id, color, 0.2))
-
-    def stop_boot(self) -> None:
-        if self._task_name == "boot":
-            self._task_id = self._task_id + 1
-            self._task_running = False
-            self._state.write()
-
-    async def rotate(self, task_id: int, color: Color, delay: float) -> None:
-        i = 0
-        n = 1
-        self._task_running = True
-        state = self._task_state
-
-        try:
-            for repeat in range(int(10 / delay)):
-                state.fill((0, 0, 0))
-                state[(i + 0) % state.n] = color
-                state[(i + 1) % state.n] = color
-                state[(i + 2) % state.n] = color
-                state[(i + 3) % state.n] = color
-                state.write()
-
-                await asyncio.sleep(delay)
-                if self._task_id != task_id:
-                    # another task running, just exit
-                    return
-
-                i = (i + 1*n) % state.n
-        finally:
-            if self._task_id == task_id:
-                self._task_running = False
-                self._task_name = None
-                self._state.write()
-
-    async def flash(self, task_id: int, color: Color, delay: float) -> None:
-        self._task_running = True
-        state = self._task_state
-
-        try:
-            for repeat in range(4):
-                state.fill(color)
-                state.write()
-
-                await asyncio.sleep(delay)
-                if self._task_id != task_id:
-                    # another task running, just exit
-                    return
-
-                state.clear()
-                state.write()
-
-                await asyncio.sleep(delay)
-                if self._task_id != task_id:
-                    # another task running, just exit
-                    return
-        finally:
-            if self._task_id == task_id:
-                self._task_running = False
-                self._task_name = None
-                self._state.write()
+    def _stop_task(self, state: LightsState) -> None:
+        if state is self._fg_task:
+            self._fg_task = None
+        if state is self._bg_task:
+            self._bg_task = None
+        if state is self._current_task:
+            self._current_task = self._fg_task or self._bg_task
+        if self._current_task is not None:
+            self._current_task.write()
+        else:
+            np = neopixel.NeoPixel(self._pin, NUM_LIGHTS, timing=True)
+            np.fill((0, 0, 0))
+            np.write()
 
 
 class MQTT:
-    def __init__(self, server: str, lights: Lights) -> None:
+    def __init__(
+            self, server: str,
+            lights: Lights, boot_lights: LightsState) -> None:
         self._lights = lights
+        self._boot_lights = boot_lights  # type: Optional[LightsState]
         config['subs_cb'] = self._callback
         config['connect_coro'] = self._conn_han
         config['server'] = server
@@ -326,19 +342,26 @@ class MQTT:
             print((topic, data))
             if 'timer_warn' in data:
                 timer = data['timer_warn']
-                await self._lights.state.set_timer(
-                    minutes=timer['time_left'],
-                    no_flash=False,
-                )
+                if timer['name'] == 'default':
+                    state = self._lights.get_bg_task()
+                    await state.set_timer(
+                        minutes=timer['time_left'],
+                        no_flash=False,
+                    )
             if 'timer_status' in data:
                 timer = data['timer_status']
-                if timer['time_left'] == timer['time_total']:
-                    await self._lights.state.set_timer(
-                        minutes=timer['time_left'],
-                        no_flash=True,
-                    )
+                if timer['name'] == 'default':
+                    state = self._lights.get_bg_task()
+                    if timer['time_left'] == 0:
+                        state.stop()
+                    else:
+                        await state.set_timer(
+                            minutes=timer['time_left'],
+                            no_flash=True,
+                        )
             if 'message' in data:
-                self._lights.set_ok()
+                state = self._lights.get_fg_task()
+                state.set_ok()
 
     def _callback(self, topic: bytes, msg: bytes) -> None:
         topic_str = topic.decode('UTF8')
@@ -357,7 +380,9 @@ class MQTT:
 
     async def connect(self) -> None:
         await self._client.connect()
-        self._lights.stop_boot()
+        if self._boot_lights is not None:
+            self._boot_lights.cancel()
+            self._boot_lights = None
 
     def close(self) -> None:
         self._client.close()
@@ -459,7 +484,11 @@ class MQTT:
 
 def main() -> None:
     lights = Lights(machine.Pin(13))
-    mqtt = MQTT(MQTT_SERVER, lights)
+
+    boot_lights = lights.get_bg_task()
+    boot_lights.set_boot()
+
+    mqtt = MQTT(MQTT_SERVER, lights, boot_lights)
 
     pin_UL = machine.Pin(25, machine.Pin.IN, machine.Pin.PULL_UP)
     pin_LL = machine.Pin(26, machine.Pin.IN, machine.Pin.PULL_UP)
@@ -508,8 +537,6 @@ def main() -> None:
     button_LL.double_func(lambda: mqtt.timer(loc2, 10))
     button_UR.double_func(lambda: mqtt.timer(loc2, 15))
     button_LR.double_func(lambda: mqtt.timer(loc2, 30))
-
-    lights.set_boot()
 
     loop = asyncio.get_event_loop()
     loop.create_task(mqtt.connect())
