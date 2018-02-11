@@ -133,7 +133,7 @@ module wall(x_depth, y_depth, z_depth) {
 led_height=3.2;
 led_base=2;
 
-led_outer_diameter=42;
+led_outer_diameter=45;
 led_inner_diameter=31;
 
 groove_height=1;
@@ -154,10 +154,10 @@ translate([0, 0, interior_height])
         for (x=[-x_interior_depth/2+4,x_interior_depth/2-4]) {
             for (y=[-y_interior_depth/2+4,y_interior_depth/2-4]) {
                 translate([x,y,-1])
-                cylinder(r=2/2,h=roof_height+2);
+                cylinder(r=2.2/2,h=roof_height+2);
 
                 translate([x,y,screw_base])
-                cylinder(r=4/2,h=roof_height+2);
+                cylinder(r=4.1/2,h=roof_height+2);
             }
         }
 
@@ -265,7 +265,7 @@ module switch_upper() {
         for (x=[-led_outer_diameter/2,led_outer_diameter/2]) {
             for (y=[-led_outer_diameter/2,led_outer_diameter/2]) {
                 translate([x,y,-1])
-                cylinder(r=2/2,h=switch_tray_thickness+2);
+                cylinder(r=2.2/2,h=switch_tray_thickness+2);
             }
         }
 
@@ -289,7 +289,7 @@ module switch_upper() {
             difference() {
                 cylinder(r=5/2,h=switch_tray_height);
                 translate([0,0,-1])
-                cylinder(r=2/2,h=switch_tray_height+2);
+                cylinder(r=2.2/2,h=switch_tray_height+2);
             }
         }
     }
