@@ -148,7 +148,7 @@ roof_height=led_base+led_height;
 
 screw_base=2;
 
-translate([0, 0, interior_height])
+!translate([0, 0, interior_height])
 {
     difference() {
         // BOX
@@ -260,7 +260,7 @@ module switch_upper() {
     }
 }
 
-!translate([0, 0, interior_height-switch_tray_height-switch_tray_thickness - 0.1])
+translate([0, 0, interior_height-switch_tray_height-switch_tray_thickness - 0.1])
 {
     difference() {
         translate([-switch_tray_width/2, -switch_tray_width/2, 0])
