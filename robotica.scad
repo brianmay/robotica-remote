@@ -13,6 +13,11 @@ y_depth = y_interior_depth+wall_thickness*2;
 
 esp32_thickness = 5;
 
+screw_head_diameter = 4.4;
+screw_tube_diameter = 2.6;
+screw_tube_outer_diameter = 5;
+screw_insert_diameter = 3;
+
 // cube([x_depth,y_depth,wall_thickness]);
 
 // cube([wall_thickness, y_depth, height]);
@@ -55,8 +60,8 @@ module wall(x_depth, y_depth, z_depth) {
         for (y=[-y_interior_depth/2+4,y_interior_depth/2-4]) {
             translate([x,y,0])
             difference() {
-                cylinder(r=5/2,h=height-wall_thickness);
-                cylinder(r=3/2,h=height);
+                cylinder(r=screw_tube_outer_diameter/2,h=height-wall_thickness);
+                cylinder(r=screw_insert_diameter/2,h=height);
             }
         }
     }
@@ -104,22 +109,22 @@ module wall(x_depth, y_depth, z_depth) {
             esp32_s_y_depth_1=18;
             translate([-esp32_s_x_depth/2,-esp32_s_y_depth_1/2,0])
             difference() {
-                cylinder(r=5/2,h=esp32_thickness);
-                cylinder(r=3/2,h=esp32_thickness+1);
+                cylinder(r=screw_tube_outer_diameter/2,h=esp32_thickness);
+                cylinder(r=screw_insert_diameter/2,h=esp32_thickness+1);
             }
             translate([-esp32_s_x_depth/2,esp32_s_y_depth_1/2,0])
             difference() {
-                cylinder(r=5/2,h=esp32_thickness);
-                cylinder(r=3/2,h=esp32_thickness+1);
+                cylinder(r=screw_tube_outer_diameter/2,h=esp32_thickness);
+                cylinder(r=screw_insert_diameter/2,h=esp32_thickness+1);
             }
 
             esp32_s_y_depth_2=19.5;
             translate([esp32_s_x_depth/2,-esp32_s_y_depth_2/2,0]) {
-                cylinder(r=5/2,h=esp32_thickness);
+                cylinder(r=screw_tube_outer_diameter/2,h=esp32_thickness);
                 cylinder(r=2.3/2,h=esp32_thickness+1.5);
             }
             translate([esp32_s_x_depth/2,esp32_s_y_depth_2/2,0]) {
-                cylinder(r=5/2,h=esp32_thickness);
+                cylinder(r=screw_tube_outer_diameter/2,h=esp32_thickness);
                 cylinder(r=2.3/2,h=esp32_thickness+1.5);
             }
 
@@ -154,10 +159,10 @@ translate([0, 0, interior_height])
         for (x=[-x_interior_depth/2+4,x_interior_depth/2-4]) {
             for (y=[-y_interior_depth/2+4,y_interior_depth/2-4]) {
                 translate([x,y,-1])
-                cylinder(r=2.2/2,h=roof_height+2);
+                cylinder(r=screw_tube_diameter/2,h=roof_height+2);
 
                 translate([x,y,screw_base])
-                cylinder(r=4.1/2,h=roof_height+2);
+                cylinder(r=screw_head_diameter/2,h=roof_height+2);
             }
         }
 
@@ -194,7 +199,7 @@ translate([0, 0, interior_height])
         for (x=[-led_outer_diameter/2,led_outer_diameter/2]) {
             for (y=[-led_outer_diameter/2,led_outer_diameter/2]) {
                 translate([x,y,-1])
-                cylinder(r=3/2,h=3+1);
+                cylinder(r=screw_insert_diameter/2,h=3+1);
             }
         }
 
@@ -265,7 +270,7 @@ module switch_upper() {
         for (x=[-led_outer_diameter/2,led_outer_diameter/2]) {
             for (y=[-led_outer_diameter/2,led_outer_diameter/2]) {
                 translate([x,y,-1])
-                cylinder(r=2.2/2,h=switch_tray_thickness+2);
+                cylinder(r=screw_tube_diameter/2,h=switch_tray_thickness+2);
             }
         }
 
@@ -287,9 +292,9 @@ module switch_upper() {
         for (y=[-led_outer_diameter/2,led_outer_diameter/2]) {
             translate([x,y,switch_tray_thickness])
             difference() {
-                cylinder(r=5/2,h=switch_tray_height);
+                cylinder(r=screw_tube_outer_diameter/2,h=switch_tray_height);
                 translate([0,0,-1])
-                cylinder(r=2.2/2,h=switch_tray_height+2);
+                cylinder(r=screw_tube_diameter/2,h=switch_tray_height+2);
             }
         }
     }
