@@ -57,7 +57,7 @@ def launch(func: Optional[Callback]) -> None:
 
 
 class Button:
-    debounce_ms = 50
+    debounce_ms = 20
     double_click_ms = 500
 
     def __init__(self, pin: machine.Pin) -> None:
@@ -107,13 +107,13 @@ class Button:
 
         def _timer() -> None:
             if num_ups == 1 and num_downs == 1:
-                print("got short click")
+                print("got short click %s" % self.pin)
                 launch(self._press_func)
             elif num_ups == 1 and num_downs == 0:
-                print("got long press")
+                print("got long press %s" % self.pin)
                 launch(self._long_func)
             elif num_ups == 2:
-                print("got double click")
+                print("got double click %s" % self.pin)
                 launch(self._double_func)
 
         doubledelay = aswitch.Delay_ms(_timer)
@@ -459,14 +459,12 @@ class MQTT:
     async def timer(self, locations: List[str], minutes: int):
         actions = [
             {
-                "message": {
-                    "text": "The timer is starting at %d minutes." % minutes,
-                },
-            },
-            {
                 "timer": {
                     "name": "default",
                     "minutes": minutes,
+                },
+                "message": {
+                    "text": "The timer is starting at %d minutes." % minutes,
                 },
             },
             {
@@ -490,10 +488,10 @@ def main() -> None:
 
     mqtt = MQTT(MQTT_SERVER, lights, boot_lights)
 
-    pin_UL = machine.Pin(25, machine.Pin.IN, machine.Pin.PULL_UP)
-    pin_LL = machine.Pin(26, machine.Pin.IN, machine.Pin.PULL_UP)
-    pin_UR = machine.Pin(23, machine.Pin.IN, machine.Pin.PULL_UP)
-    pin_LR = machine.Pin(22, machine.Pin.IN, machine.Pin.PULL_UP)
+    pin_UL = machine.Pin(33, machine.Pin.IN, machine.Pin.PULL_UP)
+    pin_LL = machine.Pin(27, machine.Pin.IN, machine.Pin.PULL_UP)
+    pin_UR = machine.Pin(15, machine.Pin.IN, machine.Pin.PULL_UP)
+    pin_LR = machine.Pin(12, machine.Pin.IN, machine.Pin.PULL_UP)
 
     button_UL = Button(pin_UL)
     button_LL = Button(pin_LL)
@@ -505,6 +503,7 @@ def main() -> None:
     current_color = None  # type: Optional[Dict[str, int]]
 
     async def button_press(play_list: str) -> None:
+        print("button_press", play_list)
         nonlocal current_play_list
         if current_play_list != play_list:
             await mqtt.music(loc1, play_list)
@@ -514,6 +513,7 @@ def main() -> None:
             current_play_list = None
 
     async def button_long(color: Dict[str, int]) -> None:
+        print("button_long", color)
         nonlocal current_color
         if current_color != color:
             await mqtt.lights(loc1, 'turn_on', color)
