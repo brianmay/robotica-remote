@@ -225,7 +225,7 @@ lower_button_thickness = 1;
 lower_button_width = switch_width + switch_border_width*2+2;
 lower_button_depth = switch_depth + switch_border_width*2+2;
 
-upper_button_thickness = roof_height;
+upper_button_thickness = roof_height + 1;
 
 button_tolarance = 0.3;
 
