@@ -31,6 +31,12 @@ RED = {
     'brightness': 100,
     'kelvin': 5500,
 }
+YELLOW = {
+    'hue': 55,
+    'saturation': 100,
+    'brightness': 100,
+    'kelvin': 5500,
+}
 GREEN = {
     'hue': 120,
     'saturation': 100,
@@ -498,7 +504,7 @@ def main() -> None:
     button_UR = Button(pin_UR)
     button_LR = Button(pin_LR)
 
-    loc1 = ['Brian']
+    loc1 = ['Twins']
     current_play_list = None  # type: Optional[str]
     current_color = None  # type: Optional[Dict[str, int]]
 
@@ -523,12 +529,12 @@ def main() -> None:
             current_color = None
 
     button_UL.press_func(lambda: button_press('red'))
-    button_LL.press_func(lambda: button_press('green'))
+    button_LL.press_func(lambda: button_press('yellow'))
     button_UR.press_func(lambda: button_press('blue'))
     button_LR.press_func(lambda: button_press('white'))
 
     button_UL.long_func(lambda: button_long(RED))
-    button_LL.long_func(lambda: button_long(GREEN))
+    button_LL.long_func(lambda: button_long(YELLOW))
     button_UR.long_func(lambda: button_long(BLUE))
     button_LR.long_func(lambda: button_long(WHITE))
 
