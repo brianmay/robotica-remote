@@ -219,27 +219,27 @@ switch_depth=12;
 switch_thickness=6;
 
 switch_border_width=1;
-switch_border_thickness=switch_thickness;
+switch_border_thickness=5.4;
 
-lower_button_thickness = 2;
-lower_button_width = switch_width + switch_border_width*2;
+lower_button_thickness = 1;
+lower_button_width = switch_width + switch_border_width*2+2;
 lower_button_depth = switch_depth + switch_border_width*2+2;
 
 upper_button_thickness = roof_height;
 
-button_tolarance = 0.1;
+button_tolarance = 0.3;
 
 switch_tray_width=led_outer_diameter + 10;
 switch_tray_thickness=1;
-switch_tray_height=switch_thickness + lower_button_thickness;
+switch_tray_height=switch_thickness + lower_button_thickness + 0.3;
 switch_spacing=2;
 
 module switch() {
     translate([switch_border_width, switch_border_width, 0]) {
-        translate([0,0,-1])
+        translate([1,0,-1])
         cube([switch_width,1,switch_tray_thickness+2]);
         
-        translate([0,switch_depth+1,-1])
+        translate([1,switch_depth+1,-1])
         cube([switch_width,1,switch_tray_thickness+2]);
     }
 }
@@ -247,10 +247,10 @@ module switch() {
 module switch_upper() {
     translate([switch_border_width, switch_border_width, 0]) {
         translate([-switch_border_width,-switch_border_width,switch_tray_thickness])
-        cube([switch_border_width, switch_depth+2+2*switch_border_width, switch_border_thickness]);
+        cube([switch_border_width+1, switch_depth+2+2*switch_border_width, switch_border_thickness]);
 
-        translate([switch_width,-switch_border_width,switch_tray_thickness])
-        cube([switch_border_width, switch_depth+2+2*switch_border_width, switch_border_thickness]);
+        translate([switch_width+1,-switch_border_width,switch_tray_thickness])
+        cube([switch_border_width+1, switch_depth+2+2*switch_border_width, switch_border_thickness]);
 
         translate([-switch_border_width,-switch_border_width,switch_tray_thickness])
         cube([switch_depth+2*switch_border_width, switch_border_width, switch_border_thickness]);
@@ -312,18 +312,26 @@ translate([0, 0, interior_height-switch_tray_height-switch_tray_thickness - 0.1]
     switch_upper();    
 }
 
-// BUTTON
-translate([0, 0, interior_height-lower_button_thickness]) {
-    translate([switch_spacing/2, switch_spacing/2, 0])
-    cube([lower_button_width, lower_button_depth, lower_button_thickness]);
+// BUTTONS
+union() {
+    for (x=[switch_spacing/2,-switch_spacing/2-lower_button_width]) {
+        for (y=[switch_spacing/2,-switch_spacing/2-lower_button_depth]) {
 
-    translate([0, 0, lower_button_thickness])
-    intersection()
-    {
-        translate([switch_spacing/2+button_tolarance, switch_spacing/2+button_tolarance, 0])
-        cube([led_inner_diameter/2 - switch_spacing/2, led_inner_diameter/2 - switch_spacing/2, upper_button_thickness]);
+            translate([0, 0, interior_height-lower_button_thickness]) {
+                translate([x, y, 0])
+                cube([lower_button_width, lower_button_depth, lower_button_thickness]);
 
-        cylinder(r=led_inner_diameter/2 - button_tolarance,h=led_height+2);
+                translate([0, 0, lower_button_thickness])
+                intersection()
+                {
+                    translate([x+button_tolarance, y+button_tolarance, 0])
+                    cube([lower_button_width-button_tolarance*2, lower_button_depth-button_tolarance*2, upper_button_thickness]);                    
+                    cylinder(r=led_inner_diameter/2 - button_tolarance,h=led_height+2);
+                }
+
+            }
+        }
     }
+}
 
 }
