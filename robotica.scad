@@ -138,7 +138,7 @@ module wall(x_depth, y_depth, z_depth) {
 led_height=3.2;
 led_base=2;
 
-led_outer_diameter=45;
+led_outer_diameter=45.1;
 led_inner_diameter=31;
 
 groove_height=1;
