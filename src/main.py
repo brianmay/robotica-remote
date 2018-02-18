@@ -11,10 +11,12 @@ from config import config
 
 try:
     from typing import Any, Dict, List, Callable, Optional, Tuple
+    from typing import Type, TypeVar
     Color = Tuple[int, int, int]
     Callback = Callable[[], Any]
 except ImportError:
-    pass
+    def TypeVar(*args: None, **kwargs: None) -> None:
+        pass
 
 MQTT_SERVER = '192.168.3.6'  # Change to suit e.g. 'iot.eclipse.org'
 NUM_LIGHTS = 16
@@ -150,22 +152,28 @@ class Button:
             self._event.clear()
 
 
-class LightsState:
+class LightsTask:
     def __init__(
             self, pin: machine.Pin, num_lights: int,
-            write_ok_func: Callable[['LightsState'], bool],
-            stop_func: Callable[['LightsState'], None]) -> None:
+            write_ok_func: Callable[['LightsTask'], bool],
+            stop_func: Callable[['LightsTask'], None]) -> None:
         self._np = neopixel.NeoPixel(pin, NUM_LIGHTS, timing=True)
         self._n = num_lights
         self._write_ok_func = write_ok_func
         self._stop_func = stop_func
+        self._stop = False
         self._cancel = False
 
     def cancel(self) -> None:
         self._cancel = True
 
     def stop(self) -> None:
+        self._stopped = True
         self._stop_func(self)
+
+    @property
+    def is_stopped(self) -> bool:
+        return self._stopped
 
     def fill(self, color: Color) -> None:
         for i in range(self._n):
@@ -191,43 +199,6 @@ class LightsState:
     def write(self) -> None:
         if self._write_ok_func(self):
             self._np.write()
-
-    def _set_timer(self, minutes: int) -> None:
-        colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # type: List[Color]
-        num_lights = (minutes % self._n)
-        num_cycles = (minutes // self._n)
-
-        if num_cycles > len(colors)-1:
-            fg = (1, 1, 1)
-        else:
-            fg = colors[num_cycles]
-
-        if num_cycles == 0:
-            bg = (0, 0, 0)
-        else:
-            prev_cycles = num_cycles - 1
-            if prev_cycles > len(colors)-1:
-                bg = (1, 1, 0)
-            else:
-                bg = colors[prev_cycles]
-
-        self.fill(bg)
-        for i in range(num_lights):
-            self[i] = fg
-        self.write()
-
-    async def set_timer(self, minutes: int, no_flash: bool=False) -> None:
-        if not no_flash:
-            self._set_timer(minutes)
-            await asyncio.sleep(0.5)
-            self._set_timer(minutes + 1)
-            await asyncio.sleep(0.5)
-            self._set_timer(minutes)
-            await asyncio.sleep(0.5)
-            self._set_timer(minutes + 1)
-            await asyncio.sleep(0.5)
-        self._set_timer(minutes)
-        # we don't call stop here as display expected to continue
 
     async def rotate(self, color: Color, delay: float) -> None:
         i = 0
@@ -273,6 +244,49 @@ class LightsState:
             # self.write()
             self.stop()
 
+
+class LightsTaskTimer(LightsTask):
+
+    def _set_timer(self, minutes: int) -> None:
+        colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # type: List[Color]
+        num_lights = (minutes % self._n)
+        num_cycles = (minutes // self._n)
+
+        if num_cycles > len(colors)-1:
+            fg = (1, 1, 1)
+        else:
+            fg = colors[num_cycles]
+
+        if num_cycles == 0:
+            bg = (0, 0, 0)
+        else:
+            prev_cycles = num_cycles - 1
+            if prev_cycles > len(colors)-1:
+                bg = (1, 1, 0)
+            else:
+                bg = colors[prev_cycles]
+
+        self.fill(bg)
+        for i in range(num_lights):
+            self[i] = fg
+        self.write()
+
+    async def set_timer(self, minutes: int, no_flash: bool=False) -> None:
+        if not no_flash:
+            self._set_timer(minutes)
+            await asyncio.sleep(0.5)
+            self._set_timer(minutes + 1)
+            await asyncio.sleep(0.5)
+            self._set_timer(minutes)
+            await asyncio.sleep(0.5)
+            self._set_timer(minutes + 1)
+            await asyncio.sleep(0.5)
+        self._set_timer(minutes)
+        # we don't call stop here as display expected to continue
+
+
+class LightsTaskStatus(LightsTask):
+
     def set_ok(self) -> None:
         loop = asyncio.get_event_loop()
         color = (0, 31, 0)
@@ -283,6 +297,9 @@ class LightsState:
         color = (31, 0, 0)
         loop.create_task(self.flash(color, 0.2))
 
+
+class LightsTaskBoot(LightsTask):
+
     def set_boot(self) -> None:
         loop = asyncio.get_event_loop()
         color = (1, 0, 0)
@@ -292,39 +309,33 @@ class LightsState:
 class Lights:
     def __init__(self, pin: machine.Pin) -> None:
         self._pin = pin  # Initialise for input
-        self._bg_task = None  # type: Optional[LightsState]
-        self._fg_task = None  # type: Optional[LightsState]
-        self._current_task = None  # type: Optional[LightsState]
+        self._tasks = []  # type: List[LightsTask]
 
-    def get_bg_task(self) -> LightsState:
-        if self._bg_task is not None:
-            self._bg_task.cancel()
-        self._bg_task = LightsState(
+    T = TypeVar('T', bound=LightsTask)
+
+    def create_task(self, task_type: Type[T]) -> T:
+        task = task_type(
             self._pin, NUM_LIGHTS, self._write_task_ok, self._stop_task)
-        if self._fg_task is None:
-            self._current_task = self._bg_task
-        return self._bg_task
+        self._tasks.append(task)
+        return task
 
-    def get_fg_task(self) -> LightsState:
-        if self._fg_task is not None:
-            self._fg_task.cancel()
-        self._fg_task = LightsState(
+    def create_bg_task(self, task_type: Type[T]) -> T:
+        task = task_type(
             self._pin, NUM_LIGHTS, self._write_task_ok, self._stop_task)
-        self._current_task = self._fg_task
-        return self._fg_task
+        self._tasks.insert(0, task)
+        return task
 
-    def _write_task_ok(self, state: LightsState) -> bool:
-        return state is self._current_task
+    def _write_task_ok(self, task: LightsTask) -> bool:
+        if len(self._tasks) <= 0:
+            return False
+        return task is self._tasks[-1]
 
-    def _stop_task(self, state: LightsState) -> None:
-        if state is self._fg_task:
-            self._fg_task = None
-        if state is self._bg_task:
-            self._bg_task = None
-        if state is self._current_task:
-            self._current_task = self._fg_task or self._bg_task
-        if self._current_task is not None:
-            self._current_task.write()
+    def _stop_task(self, task: LightsTask) -> None:
+        if len(self._tasks) <= 0:
+            return
+        self._tasks.remove(task)
+        if len(self._tasks) > 0:
+            self._tasks[-1].write()
         else:
             np = neopixel.NeoPixel(self._pin, NUM_LIGHTS, timing=True)
             np.fill((0, 0, 0))
@@ -334,14 +345,20 @@ class Lights:
 class MQTT:
     def __init__(
             self, server: str,
-            lights: Lights, boot_lights: LightsState) -> None:
+            lights: Lights, boot_lights: LightsTaskBoot) -> None:
         self._lights = lights
-        self._boot_lights = boot_lights  # type: Optional[LightsState]
+        self._boot_lights = boot_lights  # type: Optional[LightsTaskBoot]
+        self._timer_task = None  # type: Optional[LightsTaskTimer]
         config['subs_cb'] = self._callback
         config['connect_coro'] = self._conn_han
         config['server'] = server
         MQTTClient.DEBUG = True  # Optional: print diagnostic messages
         self._client = MQTTClient(config)
+
+    def _get_timer_task(self) -> LightsTaskTimer:
+        if self._timer_task is None:
+            self._timer_task = self._lights.create_bg_task(LightsTaskTimer)
+        return self._timer_task
 
     async def _process(self, topic: str, data: Any) -> None:
         if topic.startswith('/action/Brian/'):
@@ -349,25 +366,26 @@ class MQTT:
             if 'timer_warn' in data:
                 timer = data['timer_warn']
                 if timer['name'] == 'default':
-                    state = self._lights.get_bg_task()
-                    await state.set_timer(
+                    task = self._get_timer_task()
+                    await task.set_timer(
                         minutes=timer['time_left'],
                         no_flash=False,
                     )
             if 'timer_status' in data:
                 timer = data['timer_status']
                 if timer['name'] == 'default':
-                    state = self._lights.get_bg_task()
+                    task = self._get_timer_task()
                     if timer['time_left'] == 0:
-                        state.stop()
+                        task.stop()
+                        self._timer_task = None
                     else:
-                        await state.set_timer(
+                        await task.set_timer(
                             minutes=timer['time_left'],
                             no_flash=True,
                         )
             if 'message' in data:
-                state = self._lights.get_fg_task()
-                state.set_ok()
+                status_task = self._lights.create_task(LightsTaskStatus)
+                status_task.set_ok()
 
     def _callback(self, topic: bytes, msg: bytes) -> None:
         topic_str = topic.decode('UTF8')
@@ -489,7 +507,7 @@ class MQTT:
 def main() -> None:
     lights = Lights(machine.Pin(13))
 
-    boot_lights = lights.get_bg_task()
+    boot_lights = lights.create_task(LightsTaskBoot)
     boot_lights.set_boot()
 
     mqtt = MQTT(MQTT_SERVER, lights, boot_lights)
