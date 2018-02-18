@@ -223,9 +223,9 @@ class LightsTask:
             # self.write()
             self.stop()
 
-    async def flash(self, color: Color, delay: float) -> None:
+    async def flash(self, color: Color, repeats: int, delay: float) -> None:
         try:
-            for repeat in range(4):
+            for repeat in range(repeats):
                 self.fill(color)
                 self.write()
 
@@ -287,15 +287,20 @@ class LightsTaskTimer(LightsTask):
 
 class LightsTaskStatus(LightsTask):
 
+    def set_warn(self) -> None:
+        loop = asyncio.get_event_loop()
+        color = (0, 0, 31)
+        loop.create_task(self.flash(color, 4, 0.2))
+
     def set_ok(self) -> None:
         loop = asyncio.get_event_loop()
         color = (0, 31, 0)
-        loop.create_task(self.flash(color, 0.2))
+        loop.create_task(self.flash(color, 1, 0.2))
 
     def set_danger(self) -> None:
         loop = asyncio.get_event_loop()
         color = (31, 0, 0)
-        loop.create_task(self.flash(color, 0.2))
+        loop.create_task(self.flash(color, 4, 0.2))
 
 
 class LightsTaskBoot(LightsTask):
@@ -385,7 +390,7 @@ class MQTT:
                         )
             if 'message' in data:
                 status_task = self._lights.create_task(LightsTaskStatus)
-                status_task.set_ok()
+                status_task.set_warn()
 
     def _callback(self, topic: bytes, msg: bytes) -> None:
         topic_str = topic.decode('UTF8')
@@ -523,6 +528,8 @@ def main() -> None:
     button_LR = Button(pin_LR)
 
     loc1 = ['Twins']
+    loc2 = ['Dining', 'Twins', 'Brian']
+
     current_play_list = None  # type: Optional[str]
     current_color = None  # type: Optional[Dict[str, int]]
 
@@ -535,6 +542,8 @@ def main() -> None:
         else:
             await mqtt.music(loc1, None)
             current_play_list = None
+        task = lights.create_task(LightsTaskStatus)
+        task.set_ok()
 
     async def button_long(color: Dict[str, int]) -> None:
         print("button_long", color)
@@ -545,6 +554,12 @@ def main() -> None:
         else:
             await mqtt.lights(loc1, 'turn_off', color)
             current_color = None
+        task = lights.create_task(LightsTaskStatus)
+        task.set_ok()
+
+    async def button_double(minutes: int) -> None:
+        print("button_double", minutes)
+        mqtt.timer(loc2, minutes)
 
     button_UL.press_func(lambda: button_press('red'))
     button_LL.press_func(lambda: button_press('yellow'))
@@ -556,11 +571,10 @@ def main() -> None:
     button_UR.long_func(lambda: button_long(BLUE))
     button_LR.long_func(lambda: button_long(WHITE))
 
-    loc2 = ['Dining', 'Twins', 'Brian']
-    button_UL.double_func(lambda: mqtt.timer(loc2, 5))
-    button_LL.double_func(lambda: mqtt.timer(loc2, 10))
-    button_UR.double_func(lambda: mqtt.timer(loc2, 15))
-    button_LR.double_func(lambda: mqtt.timer(loc2, 30))
+    button_UL.double_func(lambda: button_double(5))
+    button_LL.double_func(lambda: button_double(10))
+    button_UR.double_func(lambda: button_double(15))
+    button_LR.double_func(lambda: button_double(30))
 
     loop = asyncio.get_event_loop()
     loop.create_task(mqtt.connect())
