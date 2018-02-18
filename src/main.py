@@ -559,7 +559,7 @@ def main() -> None:
 
     async def button_double(minutes: int) -> None:
         print("button_double", minutes)
-        mqtt.timer(loc2, minutes)
+        await mqtt.timer(loc2, minutes)
 
     button_UL.press_func(lambda: button_press('red'))
     button_LL.press_func(lambda: button_press('yellow'))
