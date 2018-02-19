@@ -367,7 +367,7 @@ class MQTT:
 
     async def _process(self, topic: str, data: Any) -> None:
         if topic.startswith('/action/Brian/'):
-            print((topic, data))
+            print("--->", topic, data)
             if 'timer_warn' in data:
                 timer = data['timer_warn']
                 if timer['name'] == 'default':
@@ -419,6 +419,7 @@ class MQTT:
     async def _publish(self, topic: str, data: Any) -> None:
         topic_raw = topic.encode('UTF8')
         msg_raw = json.dumps(data).encode('UTF8')
+        print("<---", topic, data)
         await self._client.publish(topic_raw, msg_raw, qos=0)
 
     async def say(self, locations: List[str], text: str, flash: bool=False):
