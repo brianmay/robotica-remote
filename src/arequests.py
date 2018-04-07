@@ -83,19 +83,19 @@ async def request(
     if data:
         await writer.awrite(data)
 
-    l = await reader.readline()
-    protover, status, msg = l.split(None, 2)
+    line = await reader.readline()
+    protover, status, msg = line.split(None, 2)
     status = int(status)
     # print(protover, status, msg)
     while True:
-        l = await reader.readline()
-        if not l or l == b"\r\n":
+        line = await reader.readline()
+        if not line or line == b"\r\n":
             break
-        # print(l)
-        if l.startswith(b"Transfer-Encoding:"):
-            if b"chunked" in l:
-                raise ValueError("Unsupported " + l)
-        elif l.startswith(b"Location:") and not 200 <= status <= 299:
+        # print(line)
+        if line.startswith(b"Transfer-Encoding:"):
+            if b"chunked" in line:
+                raise ValueError("Unsupported " + line)
+        elif line.startswith(b"Location:") and not 200 <= status <= 299:
             raise NotImplementedError("Redirects not yet supported")
 
     resp = Response(reader, status, msg.rstrip())
