@@ -422,7 +422,7 @@ class MQTT:
         print("<---", topic, data)
         await self._client.publish(topic_raw, msg_raw, qos=0)
 
-    async def say(self, locations: List[str], text: str, flash: bool=False):
+    async def say(self, locations: List[str], text: str, flash: bool=False) -> None:
         action = {
             "message": {"text": text}
         }
@@ -436,7 +436,7 @@ class MQTT:
 
     async def lights(
             self, locations: List[str], light_action: str,
-            color: Optional[Dict[str, int]]=None):
+            color: Optional[Dict[str, int]]=None) -> None:
         action = {
             "lights": {"action": light_action},
         }  # type: Dict[str, Any]
@@ -448,7 +448,7 @@ class MQTT:
         }
         await self._publish("/execute/", data)
 
-    async def sound(self, locations: List[str], sound: str):
+    async def sound(self, locations: List[str], sound: str) -> None:
         action = {
             "sound": {"name": sound},
         }
@@ -458,7 +458,7 @@ class MQTT:
         }
         await self._publish("/execute/", data)
 
-    async def music(self, locations: List[str], play_list: Optional[str]):
+    async def music(self, locations: List[str], play_list: Optional[str]) -> None:
         action = {}  # type: Dict[str, Any]
         if play_list is not None:
             action["music"] = {"play_list": play_list}
@@ -472,7 +472,7 @@ class MQTT:
 
     async def music_lights(
             self, locations: List[str],
-            play_list: Optional[str], color: Dict[str, int]):
+            play_list: Optional[str], color: Dict[str, int]) -> None:
         action = {
             "lights": {"action": "turn_on", "color": color},
             }  # type: Dict[str, Any]
@@ -486,7 +486,7 @@ class MQTT:
         }
         await self._publish("/execute/", data)
 
-    async def timer(self, locations: List[str], minutes: int):
+    async def timer(self, locations: List[str], minutes: int) -> None:
         actions = [
             {
                 "timer": {

@@ -1,5 +1,7 @@
 #!/bin/sh
 set -ex
+flake8 src
+mypy --strict --ignore-missing-imports src
 mkdir build || true
 mkdir build/uasyncio || true
 cp -a src/arequests.py src/main.py src/boot.py src/config.py \
