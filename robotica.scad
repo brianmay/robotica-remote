@@ -326,7 +326,7 @@ union() {
                 {
                     translate([x+button_tolarance, y+button_tolarance, 0])
                     cube([lower_button_width-button_tolarance*2, lower_button_depth-button_tolarance*2, upper_button_thickness]);                    
-                    cylinder(r=led_inner_diameter/2 - button_tolarance,h=led_height+2);
+                    cylinder(r=led_inner_diameter/2 - button_tolarance,h=upper_button_thickness+2);
                 }
 
             }
