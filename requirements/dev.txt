@@ -1,4 +1,4 @@
 -r tests.txt
 esptool==2.4.0
 mpfshell==0.8.1
-rshell==0.0.13
+rshell==0.0.14
