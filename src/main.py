@@ -463,7 +463,7 @@ class MQTT:
         if play_list is not None:
             action["music"] = {"play_list": play_list}
         else:
-            action["music"] = None
+            action["music"] = {"music_stop": True}
         data = {
             "locations": locations,
             "actions": [action],
@@ -479,7 +479,7 @@ class MQTT:
         if play_list is not None:
             action["music"] = {"play_list": play_list}
         else:
-            action["music"] = None
+            action["music"] = {"music_stop": True}
         data = {
             "locations": locations,
             "actions": [action],
