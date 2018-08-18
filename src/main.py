@@ -577,11 +577,22 @@ def main() -> None:
     button_UR.double_func(lambda: button_double(15))
     button_LR.double_func(lambda: button_double(30))
 
+    async def battery() -> None:
+        adc = machine.ADC(machine.Pin(35))
+        adc.atten(machine.ADC.ATTN_11DB)
+        while True:
+            await asyncio.sleep(60)
+            await mqtt._publish("/battery/", adc.read())
+
     loop = asyncio.get_event_loop()
     loop.create_task(mqtt.connect())
+    loop.create_task(battery())
 
     try:
         loop.run_forever()
     finally:
         mqtt.close()  # Prevent LmacRxBlk:1 errors
         loop.close()
+
+
+main()
