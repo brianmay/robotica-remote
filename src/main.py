@@ -368,7 +368,7 @@ class MQTT:
     async def _process(self, topic: str, data: Any) -> None:
         if topic.startswith('/action/Brian/'):
             print("--->", topic, data)
-            if 'timer_warn' in data:
+            if data.get('timer_warn') is not None:
                 timer = data['timer_warn']
                 if timer['name'] == 'default':
                     task = self._get_timer_task()
@@ -376,7 +376,7 @@ class MQTT:
                         minutes=timer['time_left'],
                         no_flash=False,
                     )
-            if 'timer_status' in data:
+            if data.get('timer_status') is not None:
                 timer = data['timer_status']
                 if timer['name'] == 'default':
                     task = self._get_timer_task()
@@ -388,7 +388,7 @@ class MQTT:
                             minutes=timer['time_left'],
                             no_flash=True,
                         )
-            if 'message' in data:
+            if data.get('message') is not None:
                 status_task = self._lights.create_task(LightsTaskStatus)
                 status_task.set_warn()
 
@@ -463,7 +463,7 @@ class MQTT:
         if play_list is not None:
             action["music"] = {"play_list": play_list}
         else:
-            action["music"] = {"music_stop": True}
+            action["music"] = {"stop": True}
         data = {
             "locations": locations,
             "actions": [action],
@@ -479,7 +479,7 @@ class MQTT:
         if play_list is not None:
             action["music"] = {"play_list": play_list}
         else:
-            action["music"] = {"music_stop": True}
+            action["music"] = {"stop": True}
         data = {
             "locations": locations,
             "actions": [action],
