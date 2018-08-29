@@ -1,4 +1,6 @@
 // GLOBALS
+$fn=40;
+
 wall_thickness = 1;
 radius = 10;
 
@@ -11,12 +13,12 @@ y_interior_depth=70;
 x_depth = x_interior_depth+wall_thickness*2;
 y_depth = y_interior_depth+wall_thickness*2;
 
-esp32_thickness = 5;
+esp32_thickness = 7;
 
 screw_head_diameter = 4.4;
-screw_tube_diameter = 2.6;
+screw_tube_diameter = 2.5;
 screw_tube_outer_diameter = 5;
-screw_insert_diameter = 3;
+screw_insert_diameter = 2.0;
 
 // cube([x_depth,y_depth,wall_thickness]);
 
@@ -72,7 +74,7 @@ module wall(x_depth, y_depth, z_depth) {
         // battery
         bat_x_depth=35;
         bat_y_depth=62;
-        bat_height=5;
+        bat_height=6;
         bat_support_width=1;
         bat_support_height=bat_height;
         
