@@ -430,9 +430,9 @@ class MQTT:
             action['lights'] = {"action": "flash"}
         data = {
             "locations": locations,
-            "actions": [action],
+            "action": action,
         }
-        await self._publish("/execute/", data)
+        await self._publish("execute", data)
 
     async def lights(
             self, locations: List[str], light_action: str,
@@ -444,9 +444,9 @@ class MQTT:
             action["lights"]["color"] = color
         data = {
             "locations": locations,
-            "actions": [action],
+            "action": action,
         }
-        await self._publish("/execute/", data)
+        await self._publish("execute", data)
 
     async def sound(self, locations: List[str], sound: str) -> None:
         action = {
@@ -454,9 +454,9 @@ class MQTT:
         }
         data = {
             "locations": locations,
-            "actions": [action],
+            "action": action,
         }
-        await self._publish("/execute/", data)
+        await self._publish("execute", data)
 
     async def music(self, locations: List[str], play_list: Optional[str]) -> None:
         action = {}  # type: Dict[str, Any]
@@ -466,9 +466,9 @@ class MQTT:
             action["music"] = {"stop": True}
         data = {
             "locations": locations,
-            "actions": [action],
+            "action": action,
         }
-        await self._publish("/execute/", data)
+        await self._publish("execute", data)
 
     async def music_lights(
             self, locations: List[str],
@@ -482,11 +482,12 @@ class MQTT:
             action["music"] = {"stop": True}
         data = {
             "locations": locations,
-            "actions": [action],
+            "action": action,
         }
-        await self._publish("/execute/", data)
+        await self._publish("execute", data)
 
     async def timer(self, locations: List[str], minutes: int) -> None:
+        # FIXME
         actions = [
             {
                 "timer": {
@@ -507,7 +508,7 @@ class MQTT:
             "locations": locations,
             "actions": actions,
         }
-        await self._publish("/execute/", data)
+        await self._publish("timer", data)
 
 
 def main() -> None:
@@ -528,8 +529,8 @@ def main() -> None:
     button_UR = Button(pin_UR)
     button_LR = Button(pin_LR)
 
-    loc1 = ['Twins']
-    loc2 = ['Dining', 'Twins', 'Brian']
+    loc1 = ['Brian']
+    loc2 = ['Brian']
 
     current_play_list = None  # type: Optional[str]
     current_color = None  # type: Optional[Dict[str, int]]
@@ -582,7 +583,7 @@ def main() -> None:
         adc.atten(machine.ADC.ATTN_11DB)
         while True:
             await asyncio.sleep(60)
-            await mqtt._publish("/battery/", adc.read())
+            await mqtt._publish("battery/brian", adc.read())
 
     loop = asyncio.get_event_loop()
     loop.create_task(mqtt.connect())
