@@ -18,7 +18,7 @@ except ImportError:
     def TypeVar(*args: None, **kwargs: None) -> None:
         pass
 
-MQTT_SERVER = '192.168.3.6'  # Change to suit e.g. 'iot.eclipse.org'
+MQTT_SERVER = 'staff.microcomaustralia.com.au'  # Change to suit e.g. 'iot.eclipse.org'
 NUM_LIGHTS = 16
 
 WHITE = {
@@ -79,8 +79,8 @@ class Button:
         self.buttonstate = self.rawstate()  # Initial state
 
         pin.irq(
-           trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING,
-           handler=self._irq)
+            trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING,
+            handler=self._irq)
         loop = asyncio.get_event_loop()
         loop.create_task(self._buttoncheck())  # Thread runs forever
 
@@ -271,7 +271,7 @@ class LightsTaskTimer(LightsTask):
             self[i] = fg
         self.write()
 
-    async def set_timer(self, minutes: int, no_flash: bool=False) -> None:
+    async def set_timer(self, minutes: int, no_flash: bool = False) -> None:
         if not no_flash:
             self._set_timer(minutes)
             await asyncio.sleep(0.5)
@@ -318,13 +318,13 @@ class Lights:
 
     T = TypeVar('T', bound=LightsTask)
 
-    def create_task(self, task_type: Type[T]) -> T:
+    def create_task(self, task_type: Type[T]) -> 'T':
         task = task_type(
             self._pin, NUM_LIGHTS, self._write_task_ok, self._stop_task)
         self._tasks.append(task)
         return task
 
-    def create_bg_task(self, task_type: Type[T]) -> T:
+    def create_bg_task(self, task_type: Type[T]) -> 'T':
         task = task_type(
             self._pin, NUM_LIGHTS, self._write_task_ok, self._stop_task)
         self._tasks.insert(0, task)
@@ -422,7 +422,7 @@ class MQTT:
         print("<---", topic, data)
         await self._client.publish(topic_raw, msg_raw, qos=0)
 
-    async def say(self, locations: List[str], text: str, flash: bool=False) -> None:
+    async def say(self, locations: List[str], text: str, flash: bool = False) -> None:
         action = {
             "message": {"text": text}
         }
@@ -436,7 +436,7 @@ class MQTT:
 
     async def lights(
             self, locations: List[str], light_action: str,
-            color: Optional[Dict[str, int]]=None) -> None:
+            color: Optional[Dict[str, int]] = None) -> None:
         action = {
             "lights": {"action": light_action},
         }  # type: Dict[str, Any]
@@ -475,7 +475,7 @@ class MQTT:
             play_list: Optional[str], color: Dict[str, int]) -> None:
         action = {
             "lights": {"action": "turn_on", "color": color},
-            }  # type: Dict[str, Any]
+        }  # type: Dict[str, Any]
         if play_list is not None:
             action["music"] = {"play_list": play_list}
         else:
