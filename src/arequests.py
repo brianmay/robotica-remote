@@ -64,9 +64,9 @@ async def request(
         port = int(str_port)
 
     reader, writer = await asyncio.open_connection(host, port)
-    await writer.awrite(b"%s /%s HTTP/1.0\r\n" % (method, path))
+    await writer.awrite(b"%s /%s HTTP/1.0\r\n" % (method.encode(), path.encode()))
     if "Host" not in headers:
-        await writer.awrite(b"Host: %s\r\n" % host)
+        await writer.awrite(b"Host: %s\r\n" % host.encode())
     # Iterate over keys to avoid tuple alloc
     for k in headers:
         await writer.awrite(k)

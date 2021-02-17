@@ -15,10 +15,9 @@ try:
     Color = Tuple[int, int, int]
     Callback = Callable[[], Any]
 except ImportError:
-    def TypeVar(*args: None, **kwargs: None) -> None:
+    def TypeVar(*args: None, **kwargs: None) -> None:  # type: ignore
         pass
 
-MQTT_SERVER = 'staff.microcomaustralia.com.au'  # Change to suit e.g. 'iot.eclipse.org'
 NUM_LIGHTS = 16
 
 WHITE = {
@@ -51,6 +50,11 @@ BLUE = {
     'brightness': 100,
     'kelvin': 5500,
 }
+
+
+def _handle_exception(loop: asyncio.AbstractEventLoop, context: Dict[str, Any]) -> None:
+    print('Global handler')
+    print(context["exception"])
 
 
 # If a callback is passed, run it and return.
@@ -303,6 +307,25 @@ class LightsTaskStatus(LightsTask):
         loop.create_task(self.flash(color, 4, 0.2))
 
 
+class LightsTaskColor(LightsTask):
+
+    async def _set_color(self, color: Color) -> None:
+        try:
+            while not self._cancel:
+                self.fill(color)
+                self.write()
+
+                await asyncio.sleep(1000)
+        finally:
+            # self.clear()
+            # self.write()
+            self.stop()
+
+    def set_color(self, color: Color) -> None:
+        loop = asyncio.get_event_loop()
+        loop.create_task(self._set_color(color))
+
+
 class LightsTaskBoot(LightsTask):
 
     def set_boot(self) -> None:
@@ -349,14 +372,13 @@ class Lights:
 
 class MQTT:
     def __init__(
-            self, server: str,
+            self,
             lights: Lights, boot_lights: LightsTaskBoot) -> None:
         self._lights = lights
         self._boot_lights = boot_lights  # type: Optional[LightsTaskBoot]
         self._timer_task = None  # type: Optional[LightsTaskTimer]
         config['subs_cb'] = self._callback
         config['connect_coro'] = self._conn_han
-        config['server'] = server
         MQTTClient.DEBUG = True  # Optional: print diagnostic messages
         self._client = MQTTClient(config)
 
@@ -368,26 +390,6 @@ class MQTT:
     async def _process(self, topic: str, data: Any) -> None:
         if topic.startswith('/action/Brian/'):
             print("--->", topic, data)
-            if data.get('timer_warn') is not None:
-                timer = data['timer_warn']
-                if timer['name'] == 'default':
-                    task = self._get_timer_task()
-                    await task.set_timer(
-                        minutes=timer['time_left'],
-                        no_flash=False,
-                    )
-            if data.get('timer_status') is not None:
-                timer = data['timer_status']
-                if timer['name'] == 'default':
-                    task = self._get_timer_task()
-                    if timer['time_left'] == 0:
-                        task.stop()
-                        self._timer_task = None
-                    else:
-                        await task.set_timer(
-                            minutes=timer['time_left'],
-                            no_flash=True,
-                        )
             if data.get('message') is not None:
                 status_task = self._lights.create_task(LightsTaskStatus)
                 status_task.set_warn()
@@ -422,93 +424,16 @@ class MQTT:
         print("<---", topic, data)
         await self._client.publish(topic_raw, msg_raw, qos=0)
 
-    async def say(self, locations: List[str], text: str, flash: bool = False) -> None:
-        action = {
-            "message": {"text": text}
-        }
-        if flash:
-            action['lights'] = {"action": "flash"}
-        data = {
-            "locations": locations,
-            "action": action,
-        }
-        await self._publish("execute", data)
-
     async def lights(
-            self, locations: List[str], light_action: str,
+            self, location: str, device: str, light_action: str,
             color: Optional[Dict[str, int]] = None) -> None:
-        action = {
-            "lights": {"action": light_action},
+        command = {
+            "action": light_action,
+            "scene": "default",
         }  # type: Dict[str, Any]
         if color is not None:
-            action["lights"]["color"] = color
-        data = {
-            "locations": locations,
-            "action": action,
-        }
-        await self._publish("execute", data)
-
-    async def sound(self, locations: List[str], sound: str) -> None:
-        action = {
-            "sound": {"name": sound},
-        }
-        data = {
-            "locations": locations,
-            "action": action,
-        }
-        await self._publish("execute", data)
-
-    async def music(self, locations: List[str], play_list: Optional[str]) -> None:
-        action = {}  # type: Dict[str, Any]
-        if play_list is not None:
-            action["music"] = {"play_list": play_list}
-        else:
-            action["music"] = {"stop": True}
-        data = {
-            "locations": locations,
-            "action": action,
-        }
-        await self._publish("execute", data)
-
-    async def music_lights(
-            self, locations: List[str],
-            play_list: Optional[str], color: Dict[str, int]) -> None:
-        action = {
-            "lights": {"action": "turn_on", "color": color},
-        }  # type: Dict[str, Any]
-        if play_list is not None:
-            action["music"] = {"play_list": play_list}
-        else:
-            action["music"] = {"stop": True}
-        data = {
-            "locations": locations,
-            "action": action,
-        }
-        await self._publish("execute", data)
-
-    async def timer(self, locations: List[str], minutes: int) -> None:
-        # FIXME
-        actions = [
-            {
-                "timer": {
-                    "name": "default",
-                    "minutes": minutes,
-                },
-                "message": {
-                    "text": "The timer is starting at %d minutes." % minutes,
-                },
-            },
-            {
-                "message": {
-                    "text": "Beep beep beep. The time is up.",
-                },
-            }
-        ]
-        data = {
-            "locations": locations,
-            "actions": actions,
-        }
-        await self._publish("timer", data)
+            command["color"] = color
+        await self._publish("command/{}/{}".format(location, device), command)
 
 
 def main() -> None:
@@ -517,7 +442,7 @@ def main() -> None:
     boot_lights = lights.create_task(LightsTaskBoot)
     boot_lights.set_boot()
 
-    mqtt = MQTT(MQTT_SERVER, lights, boot_lights)
+    mqtt = MQTT(lights, boot_lights)
 
     pin_UL = machine.Pin(33, machine.Pin.IN, machine.Pin.PULL_UP)
     pin_LL = machine.Pin(27, machine.Pin.IN, machine.Pin.PULL_UP)
@@ -529,44 +454,34 @@ def main() -> None:
     button_UR = Button(pin_UR)
     button_LR = Button(pin_LR)
 
-    loc1 = ['Brian']
-    loc2 = ['Brian']
+    loc1 = ['Brian', 'Light']
 
-    current_play_list = None  # type: Optional[str]
     current_color = None  # type: Optional[Dict[str, int]]
 
-    async def button_press(play_list: str) -> None:
-        print("button_press", play_list)
-        nonlocal current_play_list
-        if current_play_list != play_list:
-            await mqtt.music(loc1, play_list)
-            current_play_list = play_list
-        else:
-            await mqtt.music(loc1, None)
-            current_play_list = None
-        task = lights.create_task(LightsTaskStatus)
-        task.set_ok()
+    async def button_press(color: Color) -> None:
+        print("button_press", color)
+        task = lights.create_task(LightsTaskColor)
+        task.set_color(color)
 
     async def button_long(color: Dict[str, int]) -> None:
         print("button_long", color)
         nonlocal current_color
         if current_color != color:
-            await mqtt.lights(loc1, 'turn_on', color)
+            await mqtt.lights(loc1[0], loc1[1], 'turn_on', color)
             current_color = color
         else:
-            await mqtt.lights(loc1, 'turn_off', color)
+            await mqtt.lights(loc1[0], loc1[1], 'turn_off', color)
             current_color = None
         task = lights.create_task(LightsTaskStatus)
         task.set_ok()
 
     async def button_double(minutes: int) -> None:
         print("button_double", minutes)
-        await mqtt.timer(loc2, minutes)
 
-    button_UL.press_func(lambda: button_press('red'))
-    button_LL.press_func(lambda: button_press('yellow'))
-    button_UR.press_func(lambda: button_press('blue'))
-    button_LR.press_func(lambda: button_press('white'))
+    button_UL.press_func(lambda: button_press((0, 0, 0)))
+    button_LL.press_func(lambda: button_press((63, 63, 63)))
+    button_UR.press_func(lambda: button_press((127, 127, 127)))
+    button_LR.press_func(lambda: button_press((255, 255, 255)))
 
     button_UL.long_func(lambda: button_long(RED))
     button_LL.long_func(lambda: button_long(YELLOW))
@@ -586,6 +501,7 @@ def main() -> None:
             await mqtt._publish("battery/brian", adc.read())
 
     loop = asyncio.get_event_loop()
+    loop.set_exception_handler(_handle_exception)
     loop.create_task(mqtt.connect())
     loop.create_task(battery())
 
@@ -596,4 +512,4 @@ def main() -> None:
         loop.close()
 
 
-main()
+# main()
