@@ -540,7 +540,7 @@ def main() -> None:
     button_LR.double_func(lambda: button_double(30))
     button_UR.double_func(lambda: button_double(15))
 
-    async def callback(config: buttons.Config, id: str, label: str, data: Any) -> None:
+    async def callback(config: buttons.Config, topic: List[str], label: str, data: Any) -> None:
         number = int(config.id)
 
         button = dict_buttons[number]

@@ -2,13 +2,13 @@ import json
 from mqtt_as import MQTTClient
 
 try:
-    from type import Callable, Any, Awaitable, Type, List
+    from typing import Callable, Any, Awaitable, List
 except ImportError:
     pass
 
 
-Callback: Type[Callable[[List[str], str, Any], Awaitable[None]]]
-SubscriptionDetails: Type[tuple[str, Callback, str]]
+Callback = Callable[[List[str], str, Any], Awaitable[None]]
+SubscriptionDetails = tuple[str, Callback, str]
 
 
 def _get_message_format(message_str: str, format: str) -> Any:

@@ -3,7 +3,7 @@ import abc
 from subscriptions import Subscriptions
 
 try:
-    from type import Any, Awaitable, Callable, List, Optional, Tuple, Type
+    from typing import Any, Awaitable, Callable, List, Optional, Tuple
 except ImportError:
     pass
 
@@ -29,7 +29,7 @@ class Config:
         self.params = params
 
 
-Callback: Type[Callable[[Config, list[str], str, Any], Awaitable[None]]]
+Callback = Callable[[Config, list[str], str, Any], Awaitable[None]]
 
 
 class Command():
