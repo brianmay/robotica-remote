@@ -5,6 +5,7 @@ rm -rf build
 mkdir build
 cp -a src/*.py \
     build
+flake8 build
 mypy --strict --ignore-missing-imports build
 cp -a \
     ./micropython-async/asyn.py \
