@@ -320,6 +320,7 @@ class LightsTaskButtonColor(LightsTask):
         self[(number+3) % 16] = color
         self.write()
 
+
 class LightsTaskBoot(LightsTask):
 
     def set_boot(self) -> None:
@@ -469,13 +470,14 @@ button_configs: List[buttons.Config] = [
     )
 ]
 
+
 def main() -> None:
     lights = Lights(machine.Pin(13))
     dict_buttons: Dict[int, buttons.Button] = {}
 
-    for config in button_configs:
-        number = int(config.id)
-        dict_buttons[number] = buttons.get_button_controller(config)
+    for button_config in button_configs:
+        number = int(button_config.id)
+        dict_buttons[number] = buttons.get_button_controller(button_config)
 
     button_lights = lights.create_task(LightsTaskButtonColor)
 
@@ -545,17 +547,17 @@ def main() -> None:
         button.process_nessage(label, data)
         state = button.get_display_state()
 
-        color = (0,0,0)
+        color = (0, 0, 0)
         if state == "state_on":
-            color = (0,1,0)
+            color = (0, 1, 0)
         elif state == "state_off":
-            color = (0,0,1)
+            color = (0, 0, 1)
         elif state == "state_error":
-            color = (1,0,0)
+            color = (1, 0, 0)
         elif state == "state_hard_off":
-            color = (0,0,0)
+            color = (0, 0, 0)
         elif state == "state_unknown":
-            color = (0,0,0)
+            color = (0, 0, 0)
 
         print("{}=={}=={}".format(number, state, color))
         button_lights.set_button_color(number, color)

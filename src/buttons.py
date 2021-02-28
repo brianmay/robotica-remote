@@ -17,7 +17,9 @@ class Config:
     action: str
     params: dict[str, Any]
 
-    def __init__(self, name: str, id: str, location: str, device: str, type: str, action: str, params: dict[str, Any]) -> None:
+    def __init__(
+            self, name: str, id: str, location: str, device: str, type: str, action: str, params: dict[str, Any]
+            ) -> None:
         self.name = name
         self.id = id
         self.location = location
@@ -26,6 +28,7 @@ class Config:
         self.action = action
         self.params = params
 
+
 Callback: Type[Callable[[Config, list[str], str, Any], Awaitable[None]]]
 
 
@@ -33,6 +36,7 @@ class Command():
     location: str
     device: str
     message: dict[str, Any]
+
 
 class Button():
     config: Config
