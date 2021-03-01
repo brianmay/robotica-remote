@@ -164,7 +164,7 @@ class LightButton(Button):
         else:
             raise RuntimeError()
 
-    def _get_commands(self, scene: str) -> List[Command]:
+    def _get_commands(self, scene: str, desired_state: str) -> List[Command]:
         config = self.config
         message = {
             "scene": scene,
@@ -177,7 +177,7 @@ class LightButton(Button):
             message["action"] = "turn_off"
         elif config.action == "toggle":
             display_state = self.get_display_state()
-            if display_state == "state_on":
+            if display_state == desired_state:
                 message["action"] = "turn_off"
         else:
             raise RuntimeError()
@@ -189,13 +189,13 @@ class LightButton(Button):
         return [command]
 
     def get_press_commands(self) -> List[Command]:
-        return self._get_commands(self.config.params["scene"])
+        return self._get_commands(self.config.params["scene"], "state_on")
 
     def get_long_commands(self) -> List[Command]:
-        return self._get_commands("dim")
+        return self._get_commands("dim", "state_dim")
 
     def get_double_commands(self) -> List[Command]:
-        return self._get_commands("rainbow")
+        return self._get_commands("rainbow", "state_rainbow")
 
 
 class SwitchButton(Button):
