@@ -59,12 +59,11 @@ class Button():
     def get_press_commands(self) -> List[Command]:
         raise NotImplementedError()
 
+    def get_long_commands(self) -> List[Command]:
+        return []
 
-def _has_scene(scenes: Optional[List[str]], scene: str) -> Optional[bool]:
-    if scenes is None:
-        return None
-    else:
-        return scene in scenes
+    def get_double_commands(self) -> List[Command]:
+        return []
 
 
 def _has_priority(priorities: Optional[List[int]], priority: int) -> Optional[bool]:
@@ -115,7 +114,6 @@ class LightButton(Button):
 
     def get_display_state(self) -> str:
         config = self.config
-        correct_scene = _has_scene(self.scenes, config.params["scene"])
         correct_priority = _has_priority(self.priorities, config.params["priority"])
 
         if self.power == "HARD_OFF":
@@ -125,14 +123,16 @@ class LightButton(Button):
                 return "state_on"
             elif self.power == "OFF" and self.scenes == []:
                 return "state_off"
-            elif correct_scene is None:
+            elif self.scenes is None:
                 return "state_unknown"
-            elif correct_scene is True:
+            elif config.params["scene"] in self.scenes:
                 return "state_on"
-            elif correct_scene is False:
-                return "state_off"
+            elif "dim" in self.scenes:
+                return "state_dim"
+            elif "rainbow" in self.scenes:
+                return "state_rainbow"
             else:
-                raise RuntimeError()
+                return "state_off"
         elif config.action == "turn_off":
             if self.power == "ON" and self.scenes == []:
                 return "state_off"
@@ -151,21 +151,23 @@ class LightButton(Button):
                 return "state_on"
             elif self.power == "OFF" and self.scenes == []:
                 return "state_off"
-            elif correct_scene is None:
+            elif self.scenes is None:
                 return "state_unknown"
-            elif correct_scene is True:
+            elif config.params["scene"] in self.scenes:
                 return "state_on"
-            elif correct_scene is False:
-                return "state_off"
+            elif "dim" in self.scenes:
+                return "state_dim"
+            elif "rainbow" in self.scenes:
+                return "state_rainbow"
             else:
-                raise RuntimeError()
+                return "state_off"
         else:
             raise RuntimeError()
 
-    def get_press_commands(self) -> List[Command]:
+    def _get_commands(self, scene: str) -> List[Command]:
         config = self.config
         message = {
-            "scene": config.params["scene"],
+            "scene": scene,
             "priority": config.params["priority"]
         }
 
@@ -185,6 +187,15 @@ class LightButton(Button):
         command.device = config.device
         command.message = message
         return [command]
+
+    def get_press_commands(self) -> List[Command]:
+        return self._get_commands(self.config.params["scene"])
+
+    def get_long_commands(self) -> List[Command]:
+        return self._get_commands("dim")
+
+    def get_double_commands(self) -> List[Command]:
+        return self._get_commands("rainbow")
 
 
 class SwitchButton(Button):
