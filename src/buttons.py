@@ -4,6 +4,7 @@ from subscriptions import Subscriptions
 
 try:
     from typing import Any, Awaitable, Callable, List, Optional, Tuple
+    Callback = Callable[['Config', list[str], str, Any], Awaitable[None]]
 except ImportError:
     pass
 
@@ -27,9 +28,6 @@ class Config:
         self.type = type
         self.action = action
         self.params = params
-
-
-Callback = Callable[[Config, list[str], str, Any], Awaitable[None]]
 
 
 class Command():

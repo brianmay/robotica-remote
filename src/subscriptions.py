@@ -3,12 +3,10 @@ from mqtt_as import MQTTClient
 
 try:
     from typing import Callable, Any, Awaitable, List
+    Callback = Callable[[List[str], str, Any], Awaitable[None]]
+    SubscriptionDetails = tuple[str, Callback, str]
 except ImportError:
     pass
-
-
-Callback = Callable[[List[str], str, Any], Awaitable[None]]
-SubscriptionDetails = tuple[str, Callback, str]
 
 
 def _get_message_format(message_str: str, format: str) -> Any:
