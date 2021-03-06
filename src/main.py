@@ -310,6 +310,24 @@ class LightsTaskStatus(LightsTask):
         loop.create_task(self.flash(color, 4, 0.2))
 
 
+class LightsTaskColor(LightsTask):
+    async def _set_color(self, color: Color) -> None:
+        try:
+            while not self._cancel:
+                self.fill(color)
+                self.write()
+
+                await asyncio.sleep(1000)
+        finally:
+            # self.clear()
+            # self.write()
+            self.stop()
+
+    def set_color(self, color: Color) -> None:
+        loop = asyncio.get_event_loop()
+        loop.create_task(self._set_color(color))
+
+
 class LightsTaskButtonColor(LightsTask):
 
     def set_button_colors(self, number: int, colors: List[Color]) -> None:
@@ -467,22 +485,32 @@ button_configs: List[buttons.Config] = [
         type="switch",
         action="toggle",
         params={}
+    ),
+    buttons.Config(
+        name="Night",
+        id="night",
+        location="Brian",
+        device="Night",
+        type="switch",
+        action="toggle",
+        params={}
     )
 ]
 
 
 def main() -> None:
     lights = Lights(machine.Pin(13))
-    dict_buttons: Dict[int, buttons.Button] = {}
+    dict_buttons: Dict[str, buttons.Button] = {}
 
     for button_config in button_configs:
-        number = int(button_config.id)
-        dict_buttons[number] = buttons.get_button_controller(button_config)
+        dict_buttons[button_config.id] = buttons.get_button_controller(button_config)
 
     button_lights = lights.create_task(LightsTaskButtonColor)
 
     boot_lights = lights.create_task(LightsTaskBoot)
     boot_lights.set_boot()
+
+    black_task: Optional[LightsTaskColor] = None
 
     mqtt = MQTT()
 
@@ -498,21 +526,21 @@ def main() -> None:
 
     async def button_press(number: int) -> None:
         print("button_press", number)
-        button = dict_buttons[number]
+        button = dict_buttons[str(number)]
         for command in button.get_press_commands():
             print(command.message)
             await mqtt.command(command.location, command.device, command.message)
 
     async def button_long(number: int) -> None:
         print("button_long", number)
-        button = dict_buttons[number]
+        button = dict_buttons[str(number)]
         for command in button.get_long_commands():
             print(command.message)
             await mqtt.command(command.location, command.device, command.message)
 
     async def button_double(number: int) -> None:
         print("button_double", number)
-        button = dict_buttons[number]
+        button = dict_buttons[str(number)]
         for command in button.get_double_commands():
             print(command.message)
             await mqtt.command(command.location, command.device, command.message)
@@ -533,30 +561,39 @@ def main() -> None:
     button_UR.double_func(lambda: button_double(3))
 
     async def callback(config: buttons.Config, topic: List[str], label: str, data: Any) -> None:
-        number = int(config.id)
-
-        button = dict_buttons[number]
+        button = dict_buttons[config.id]
         button.process_nessage(label, data)
         state = button.get_display_state()
 
-        colors = [(0, 0, 0)]*4
-        if state == "state_on":
-            colors = [(0, 1, 0)]*4
-        elif state == "state_dim":
-            colors = [(1, 1, 0)]*4
-        elif state == "state_rainbow":
-            colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1)]
-        elif state == "state_off":
-            colors = [(0, 0, 1)]*4
-        elif state == "state_error":
-            colors = [(1, 0, 0)]*4
-        elif state == "state_hard_off":
-            colors = [(0, 0, 0)]*4
-        elif state == "state_unknown":
-            colors = [(0, 0, 0)]*4
+        if config.id == "night":
+            nonlocal black_task
+            if state == "state_on" and black_task is None:
+                black_task = lights.create_task(LightsTaskColor)
+                black_task.set_color((0, 0, 0))
+            if state != "state_on" and black_task is not None:
+                black_task.stop()
+                black_task = None
+        else:
+            number = int(config.id)
 
-        print("{}=={}=={}".format(number, state, colors))
-        button_lights.set_button_colors(number, colors)
+            colors = [(0, 0, 0)]*4
+            if state == "state_on":
+                colors = [(0, 1, 0)]*4
+            elif state == "state_dim":
+                colors = [(1, 1, 0)]*4
+            elif state == "state_rainbow":
+                colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1)]
+            elif state == "state_off":
+                colors = [(0, 0, 1)]*4
+            elif state == "state_error":
+                colors = [(1, 0, 0)]*4
+            elif state == "state_hard_off":
+                colors = [(0, 0, 0)]*4
+            elif state == "state_unknown":
+                colors = [(0, 0, 0)]*4
+
+            print("{}=={}=={}".format(number, state, colors))
+            button_lights.set_button_colors(number, colors)
 
     async def subscribe() -> None:
         await mqtt.connect()
@@ -583,4 +620,4 @@ def main() -> None:
         loop.close()
 
 
-# main()
+main()
