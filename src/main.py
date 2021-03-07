@@ -580,7 +580,7 @@ def main() -> None:
             if state == "state_on":
                 colors = [(0, 1, 0)]*4
             elif state == "state_dim":
-                colors = [(1, 1, 0)]*4
+                colors = [(0, 1, 1)]*4
             elif state == "state_rainbow":
                 colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1)]
             elif state == "state_off":
